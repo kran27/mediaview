@@ -31,23 +31,33 @@ export const registerFileRoute = (app) => {
 
       if (range) {
         const [startRaw, endRaw] = range.replace(/bytes=/, '').split('-');
-        const start = Number(startRaw);
+        const start = startRaw ? Number(startRaw) : 0;
         const end = endRaw ? Number(endRaw) : stats.size - 1;
+        const clampedStart = Math.min(Math.max(start, 0), stats.size - 1);
+        const clampedEnd = Math.min(Math.max(end, clampedStart), stats.size - 1);
 
-        if (Number.isNaN(start) || Number.isNaN(end) || start > end) {
+        if (
+          Number.isNaN(start) ||
+          Number.isNaN(end) ||
+          start < 0 ||
+          end < 0 ||
+          start >= stats.size ||
+          end >= stats.size ||
+          clampedStart > clampedEnd
+        ) {
           res.status(416).setHeader('Content-Range', `bytes */${stats.size}`).end();
           return;
         }
 
-        const chunkSize = end - start + 1;
+        const chunkSize = clampedEnd - clampedStart + 1;
         res.writeHead(206, {
-          'Content-Range': `bytes ${start}-${end}/${stats.size}`,
+          'Content-Range': `bytes ${clampedStart}-${clampedEnd}/${stats.size}`,
           'Accept-Ranges': 'bytes',
           'Content-Length': chunkSize,
           'Content-Type': mimeType,
           'Cache-Control': 'public, max-age=3600'
         });
-        fs.createReadStream(absolutePath, { start, end }).pipe(res);
+        fs.createReadStream(absolutePath, { start: clampedStart, end: clampedEnd }).pipe(res);
         return;
       }
 
