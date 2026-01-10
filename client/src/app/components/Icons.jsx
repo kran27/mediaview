@@ -43,6 +43,24 @@ export const IconDoc = () => (
   </svg>
 );
 
+export const IconGrid = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" className="icon">
+    <rect x="4" y="4" width="7" height="7" rx="1" />
+    <rect x="13" y="4" width="7" height="7" rx="1" />
+    <rect x="4" y="13" width="7" height="7" rx="1" />
+    <rect x="13" y="13" width="7" height="7" rx="1" />
+  </svg>
+);
+
+export const IconList = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" className="icon">
+    <path d="M8 6h12M8 12h12M8 18h12" />
+    <circle cx="5" cy="6" r="1" />
+    <circle cx="5" cy="12" r="1" />
+    <circle cx="5" cy="18" r="1" />
+  </svg>
+);
+
 export const iconForEntry = (entry) => {
   if (entry.isDir) return <IconFolder />;
   switch (entry.type) {

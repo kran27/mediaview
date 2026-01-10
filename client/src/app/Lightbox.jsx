@@ -25,6 +25,7 @@ const Lightbox = ({
   const shouldShowDimensions = selectedEntry?.type === 'image' || selectedEntry?.type === 'video';
   const hasDimensions = Number.isFinite(mediaMeta.width) && Number.isFinite(mediaMeta.height);
   const placeholderDimensions = '-- × --';
+  const isLoadingContent = mediaLoading || textPreview.status === 'loading';
 
   useEffect(() => {
     if (!open) return;
@@ -103,7 +104,13 @@ const Lightbox = ({
       <div className="lightbox-stage">
         <div
           className={`lightbox-body${selectedEntry.type === 'document' ? ' is-document' : ''}`}
-          onClick={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            if (isLoadingContent) {
+              onClose();
+              return;
+            }
+            event.stopPropagation();
+          }}
         >
           {(selectedEntry.type === 'image' || selectedEntry.type === 'video') && (
             <div className={`lightbox-media${mediaLoading ? ' is-loading' : ''}`}>

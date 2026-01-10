@@ -1,24 +1,23 @@
 import React from 'react';
 import './ViewToggle.css';
+import { IconGrid, IconList } from './Icons.jsx';
 
 const ViewToggle = ({ viewMode, onChange, zoomLevel, onZoomChange }) => (
-  <div className={`view-toggle ${viewMode === 'grid' ? 'show-zoom' : ''}`}>
-    <div className="view-segment">
-      <div className={`view-mode grid-mode ${viewMode === 'grid' ? 'active' : ''}`}>
-        <button
-          type="button"
-          className={`mode-button ${viewMode === 'grid' ? 'active' : ''}`}
-          onClick={() => onChange('grid')}
-        >
-          Grid
-        </button>
-        <div className="zoom-segment" role="group" aria-label="Grid size">
+  <div className="view-toggle" role="group" aria-label="View mode">
+    <div className={`view-segment ${viewMode === 'grid' ? 'active' : ''}`}>
+      <button type="button" className="view-button" onClick={() => onChange('grid')}>
+        <span className="view-icon">
+          <IconGrid />
+        </span>
+        <span>Grid</span>
+      </button>
+      {viewMode === 'grid' && (
+        <div className="size-toggle" role="group" aria-label="Grid size">
           <button
             type="button"
             className={zoomLevel === 'sm' ? 'active' : ''}
             onClick={() => onZoomChange('sm')}
             aria-label="Small thumbnails"
-            disabled={viewMode !== 'grid'}
           >
             S
           </button>
@@ -27,7 +26,6 @@ const ViewToggle = ({ viewMode, onChange, zoomLevel, onZoomChange }) => (
             className={zoomLevel === 'md' ? 'active' : ''}
             onClick={() => onZoomChange('md')}
             aria-label="Medium thumbnails"
-            disabled={viewMode !== 'grid'}
           >
             M
           </button>
@@ -36,18 +34,18 @@ const ViewToggle = ({ viewMode, onChange, zoomLevel, onZoomChange }) => (
             className={zoomLevel === 'lg' ? 'active' : ''}
             onClick={() => onZoomChange('lg')}
             aria-label="Large thumbnails"
-            disabled={viewMode !== 'grid'}
           >
             L
           </button>
         </div>
-      </div>
-      <button
-        type="button"
-        className={`view-mode list-mode ${viewMode === 'list' ? 'active' : ''}`}
-        onClick={() => onChange('list')}
-      >
-        List
+      )}
+    </div>
+    <div className={`view-segment ${viewMode === 'list' ? 'active' : ''}`}>
+      <button type="button" className="view-button" onClick={() => onChange('list')}>
+        <span className="view-icon">
+          <IconList />
+        </span>
+        <span>List</span>
       </button>
     </div>
   </div>

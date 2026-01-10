@@ -22,6 +22,33 @@ export const useDirectoryData = () => {
   const lastGoodPathRef = useRef('');
   const [lastGoodPath, setLastGoodPath] = useState('');
   const resolvePathRef = useRef(0);
+  const hasFetchedTreeRef = useRef(false);
+
+  const applyTreeNodes = (nodes) => {
+    if (!nodes) return;
+    setTree((prev) => {
+      const next = { ...prev };
+      Object.values(nodes).forEach((node) => {
+        if (!node) return;
+        const prevNode = next[node.path];
+        next[node.path] = {
+          path: node.path,
+          name: node.name || prevNode?.name || (node.path ? getBasename(node.path) : 'Archive'),
+          children: Array.isArray(node.children) ? node.children : [],
+          expanded: prevNode?.expanded ?? node.path === ''
+        };
+      });
+      return next;
+    });
+  };
+
+  const fetchTree = async () => {
+    const response = await fetch(`${API_BASE}/api/tree`);
+    if (!response.ok) {
+      throw new Error('Failed to load tree');
+    }
+    return response.json();
+  };
 
   const fetchList = async (pathValue, options = {}) => {
     const { force = false, background = false } = options;
@@ -309,6 +336,21 @@ export const useDirectoryData = () => {
   useEffect(() => {
     currentPathRef.current = currentPath;
   }, [currentPath]);
+
+  useEffect(() => {
+    let isActive = true;
+    if (hasFetchedTreeRef.current) return () => {};
+    hasFetchedTreeRef.current = true;
+    fetchTree()
+      .then((data) => {
+        if (!isActive) return;
+        applyTreeNodes(data?.nodes);
+      })
+      .catch(() => {});
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   const filteredEntries = useMemo(() => {
     if (!directory) return [];

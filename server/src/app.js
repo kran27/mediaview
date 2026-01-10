@@ -2,6 +2,7 @@ import express from 'express';
 import { registerFileRoute } from './routes/file.js';
 import { registerHealthRoute } from './routes/health.js';
 import { registerListRoute } from './routes/list.js';
+import { registerTreeRoute } from './routes/tree.js';
 import { registerThumbnailRoute } from './routes/thumbnail.js';
 
 export const createApp = () => {
@@ -20,6 +21,7 @@ export const createApp = () => {
 
   registerHealthRoute(app);
   registerListRoute(app);
+  registerTreeRoute(app);
   registerThumbnailRoute(app);
   registerFileRoute(app);
 
