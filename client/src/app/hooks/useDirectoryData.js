@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { API_BASE } from '../../lib/api.js';
-import { getBasename } from '../../lib/format.js';
 import { isViewableEntry } from '../../lib/fileTypes.js';
-import { buildStats } from '../../lib/stats.js';
+import { useDirectoryTree } from './useDirectoryTree.js';
+import { useDirectoryCache } from './useDirectoryCache.js';
 
 export const useDirectoryData = () => {
   const [directory, setDirectory] = useState(null);
@@ -14,267 +13,59 @@ export const useDirectoryData = () => {
   const [sortKey, setSortKey] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
   const [status, setStatus] = useState({ loading: true, error: null });
-  const [tree, setTree] = useState({
-    '': { path: '', name: 'Archive', expanded: true, children: null }
-  });
-  const cacheRef = useRef(new Map());
+  const {
+    tree,
+    treeHydratedRef,
+    treePrefetchingRef,
+    updateTreeWithEntries,
+    expandAncestors,
+    toggleNode
+  } = useDirectoryTree();
+  const {
+    applyListing,
+    fetchList,
+    getCachedListing,
+    getLastResolvablePath,
+    hydratePathChain,
+    resolveLastGoodPath
+  } = useDirectoryCache({ updateTreeWithEntries });
   const currentPathRef = useRef('');
-  const lastGoodPathRef = useRef('');
   const [lastGoodPath, setLastGoodPath] = useState('');
   const resolvePathRef = useRef(0);
-  const treeHydratedRef = useRef(false);
-  const treePrefetchingRef = useRef(true);
-  const treeFetchRef = useRef(null);
 
-  const applyTreeNodes = (nodes) => {
-    if (!nodes) return;
-    setTree((prev) => {
-      const next = { ...prev };
-      Object.values(nodes).forEach((node) => {
-        if (!node) return;
-        const prevNode = next[node.path];
-        next[node.path] = {
-          path: node.path,
-          name: node.name || prevNode?.name || (node.path ? getBasename(node.path) : 'Archive'),
-          children: Array.isArray(node.children) ? node.children : [],
-          expanded: prevNode?.expanded ?? node.path === ''
-        };
-      });
-      return next;
-    });
-  };
-
-  const fetchTree = async () => {
-    const response = await fetch(`${API_BASE}/api/tree`);
-    if (!response.ok) {
-      throw new Error('Failed to load tree');
-    }
-    return response.json();
-  };
-
-  const fetchList = async (pathValue, options = {}) => {
-    const { force = false, background = false } = options;
-    const cached = cacheRef.current.get(pathValue);
-    if (cached && !force) {
-      if (background) {
-        void fetchList(pathValue, { force: true })
-          .then((data) => {
-            applyListing(pathValue, data, { expand: false });
-            if (currentPathRef.current === pathValue) {
-              setDirectory(data);
-              setSelected((prev) =>
-                prev && data.entries.find((entry) => entry.path === prev.path) ? prev : null
-              );
-            }
-          })
-          .catch(() => {});
-      }
-      return cached;
-    }
-    const response = await fetch(`${API_BASE}/api/list?path=${encodeURIComponent(pathValue)}`);
-    if (!response.ok) {
-      if (response.status === 404) {
-        throw new Error('Requested content could not be found.');
-      }
-      throw new Error(`Failed to load ${pathValue || 'root'}`);
-    }
-    return response.json();
-  };
-
-  const updateTreeWithEntries = (pathValue, entries, options = {}) => {
-    const { expand = false, rootLabel } = options;
-    setTree((prev) => {
-      const next = { ...prev };
-      const nodeName = pathValue ? getBasename(pathValue) : rootLabel || prev['']?.name || 'Archive';
-      const children = entries.filter((entry) => entry.isDir).map((entry) => entry.path);
-      next[pathValue] = {
-        path: pathValue,
-        name: nodeName,
-        expanded: expand ? true : next[pathValue]?.expanded ?? false,
-        children
-      };
-      entries
-        .filter((entry) => entry.isDir)
-        .forEach((entry) => {
-          if (!next[entry.path]) {
-            next[entry.path] = {
-              path: entry.path,
-              name: entry.name,
-              expanded: false,
-              children: null
-            };
-          }
-        });
-      return next;
-    });
-  };
-
-  const applyListing = (pathValue, data, options = {}) => {
-    cacheRef.current.set(pathValue, data);
-    updateTreeWithEntries(pathValue, data.entries, {
-      expand: options.expand ?? true,
-      rootLabel: data.root?.name
-    });
-    if (data.children) {
-      const rootLabel = data.root?.name;
-      Object.entries(data.children).forEach(([childPath, childEntries]) => {
-        if (!Array.isArray(childEntries)) return;
-        const childName = childPath ? getBasename(childPath) : rootLabel || 'Archive';
-        const childData = {
-          root: data.root,
-          current: {
-            name: childName,
-            path: childPath
-          },
-          stats: buildStats(childEntries),
-          entries: childEntries
-        };
-        cacheRef.current.set(childPath, childData);
-        updateTreeWithEntries(childPath, childEntries, {
-          expand: false,
-          rootLabel
-        });
-      });
+  const setLastGoodPathValue = (value, options = {}) => {
+    const { allowEmpty = false } = options;
+    if (value || allowEmpty) {
+      setLastGoodPath(value);
     }
   };
 
-  const getPathChain = (pathValue) => {
-    const segments = pathValue.split('/').filter(Boolean);
-    const paths = [''];
-    let current = '';
-    segments.forEach((segment) => {
-      current = current ? `${current}/${segment}` : segment;
-      paths.push(current);
-    });
-    return paths;
+  const getSelection = (entries, selectPath) => {
+    if (!selectPath) return null;
+    return entries.find((entry) => entry.path === selectPath || entry.name === selectPath) || null;
   };
 
-  const getLastResolvablePath = (pathValue) => {
-    const chain = getPathChain(pathValue);
-    for (let index = chain.length - 1; index >= 0; index -= 1) {
-      const candidate = chain[index];
-      if (cacheRef.current.has(candidate)) {
-        return candidate;
-      }
-    }
-    return '';
+  const applyDirectoryState = (data, pathValue, selection) => {
+    setDirectory(data);
+    setCurrentPath(pathValue);
+    setSelected(selection);
+    expandAncestors(pathValue, data.root?.name || 'Archive');
+    setStatus({ loading: false, error: null });
   };
-
-  const resolveLastGoodPath = async (pathValue, requestId) => {
-    const chain = getPathChain(pathValue);
-    let lastSuccess = '';
-    for (const chainPath of chain) {
-      try {
-        const data = await fetchList(chainPath);
-        if (resolvePathRef.current !== requestId) return;
-        applyListing(chainPath, data, { expand: true });
-        lastSuccess = chainPath;
-      } catch (error) {
-        break;
-      }
-    }
-    if (resolvePathRef.current !== requestId) return;
-    lastGoodPathRef.current = lastSuccess;
-    setLastGoodPath(lastSuccess);
-  };
-
-  const hydratePathChain = async (pathValue) => {
-    if (!pathValue) return;
-    const chain = getPathChain(pathValue);
-    const chainToFetch = chain.slice(0, -1);
-    chainToFetch.forEach((chainPath) => {
-      const cached = cacheRef.current.get(chainPath);
-      if (!cached) return;
-      updateTreeWithEntries(chainPath, cached.entries, {
-        expand: true,
-        rootLabel: cached.root?.name
-      });
-    });
-
-    let index = 0;
-    while (index < chainToFetch.length) {
-      const chainPath = chainToFetch[index];
-      if (!cacheRef.current.has(chainPath)) {
-        try {
-          const data = await fetchList(chainPath, { background: true });
-          applyListing(chainPath, data, { expand: true });
-        } catch (error) {
-          // ignore background failures
-        }
-      }
-
-      const nextPath = chainToFetch[index + 1];
-      if (nextPath && cacheRef.current.has(nextPath)) {
-        const cachedNext = cacheRef.current.get(nextPath);
-        if (cachedNext) {
-          updateTreeWithEntries(nextPath, cachedNext.entries, {
-            expand: true,
-            rootLabel: cachedNext.root?.name
-          });
-        }
-        index += 2;
-        continue;
-      }
-
-      index += 1;
-    }
-  };
-
-  const expandAncestors = (pathValue, rootLabel) => {
-    setTree((prev) => {
-      const next = { ...prev };
-      const resolvedRootLabel = rootLabel || prev['']?.name || 'Archive';
-      next[''] = { ...(next[''] || {}), path: '', name: resolvedRootLabel, expanded: true };
-      if (!pathValue) return next;
-      const segments = pathValue.split('/').filter(Boolean);
-      let parentPath = '';
-      segments.forEach((segment) => {
-        const current = parentPath ? `${parentPath}/${segment}` : segment;
-        const parentNode = next[parentPath] || {
-          path: parentPath,
-          name: parentPath ? getBasename(parentPath) : resolvedRootLabel,
-          expanded: true,
-          children: []
-        };
-        const children = Array.isArray(parentNode.children) ? [...parentNode.children] : [];
-        if (!children.includes(current)) {
-          children.push(current);
-        }
-        next[parentPath] = { ...parentNode, children, expanded: true };
-        next[current] = {
-          ...(next[current] || {}),
-          path: current,
-          name: segment,
-          expanded: true
-        };
-        parentPath = current;
-      });
-      return next;
-    });
-  };
-
 
   const loadDirectory = async (pathValue, options = {}) => {
     const { selectPath = '' } = options;
-    const cached = cacheRef.current.get(pathValue);
+    const cached = getCachedListing(pathValue);
     if (!cached && pathValue && treeHydratedRef.current) {
       expandAncestors(pathValue, tree['']?.name || 'Archive');
     }
     if (cached) {
-      const selection = selectPath
-        ? cached.entries.find((entry) => entry.path === selectPath || entry.name === selectPath) ||
-          null
-        : null;
+      const selection = getSelection(cached.entries, selectPath);
       const shouldLightbox = Boolean(selectPath) && isViewableEntry(selection);
-      setDirectory(cached);
-      setCurrentPath(pathValue);
       if (pathValue) {
-        lastGoodPathRef.current = pathValue;
-        setLastGoodPath(pathValue);
+        setLastGoodPathValue(pathValue);
       }
-      setSelected(selection);
-      expandAncestors(pathValue, cached.root?.name || 'Archive');
-      setStatus({ loading: false, error: null });
+      applyDirectoryState(cached, pathValue, selection);
       if (pathValue) {
         void hydratePathChain(pathValue);
       }
@@ -292,28 +83,23 @@ export const useDirectoryData = () => {
       }
       const data = await listPromise;
       applyListing(pathValue, data, { expand: true });
-      const selection = selectPath
-        ? data.entries.find((entry) => entry.path === selectPath || entry.name === selectPath) ||
-          null
-        : null;
+      const selection = getSelection(data.entries, selectPath);
       const shouldLightbox = Boolean(selectPath) && isViewableEntry(selection);
-      setDirectory(data);
-      setCurrentPath(pathValue);
       if (pathValue) {
-        lastGoodPathRef.current = pathValue;
-        setLastGoodPath(pathValue);
+        setLastGoodPathValue(pathValue);
       }
-      setSelected(selection);
-      expandAncestors(pathValue, data.root.name);
-      setStatus({ loading: false, error: null });
+      applyDirectoryState(data, pathValue, selection);
       return { selection, shouldLightbox };
     } catch (error) {
       const fallbackPath = getLastResolvablePath(pathValue);
-      lastGoodPathRef.current = fallbackPath;
-      setLastGoodPath(fallbackPath);
+      setLastGoodPathValue(fallbackPath, { allowEmpty: true });
       resolvePathRef.current += 1;
       const requestId = resolvePathRef.current;
-      void resolveLastGoodPath(pathValue, requestId);
+      void resolveLastGoodPath(pathValue, () => resolvePathRef.current === requestId)
+        .then((lastSuccess) => {
+          if (lastSuccess === null) return;
+          setLastGoodPathValue(lastSuccess, { allowEmpty: true });
+        });
       setStatus({ loading: false, error: error.message });
       return { selection: null, shouldLightbox: false };
     }
@@ -321,7 +107,16 @@ export const useDirectoryData = () => {
 
   const loadChildren = async (pathValue) => {
     try {
-      const data = await fetchList(pathValue, { background: true });
+      const data = await fetchList(pathValue, {
+        background: true,
+        onBackgroundUpdate: (activePath, listing) => {
+          if (currentPathRef.current !== activePath) return;
+          setDirectory(listing);
+          setSelected((prev) =>
+            prev && listing.entries.find((entry) => entry.path === prev.path) ? prev : null
+          );
+        }
+      });
       applyListing(pathValue, data, { expand: false });
     } catch (error) {
       setStatus({ loading: false, error: error.message });
@@ -339,13 +134,7 @@ export const useDirectoryData = () => {
     ) {
       loadChildren(pathValue);
     }
-    setTree((prev) => ({
-      ...prev,
-      [pathValue]: {
-        ...prev[pathValue],
-        expanded: !prev[pathValue].expanded
-      }
-    }));
+    toggleNode(pathValue);
   };
 
   const handleSortClick = (key) => {
@@ -360,28 +149,6 @@ export const useDirectoryData = () => {
   useEffect(() => {
     currentPathRef.current = currentPath;
   }, [currentPath]);
-
-  useEffect(() => {
-    let isActive = true;
-    if (!treeFetchRef.current) {
-      treePrefetchingRef.current = true;
-      treeFetchRef.current = fetchTree();
-    }
-    treeFetchRef.current
-      .then((data) => {
-        if (!isActive) return;
-        applyTreeNodes(data?.nodes);
-        treeHydratedRef.current = true;
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!isActive) return;
-        treePrefetchingRef.current = false;
-      });
-    return () => {
-      isActive = false;
-    };
-  }, []);
 
   const filteredEntries = useMemo(() => {
     if (!directory) return [];
