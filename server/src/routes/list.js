@@ -62,15 +62,17 @@ export const registerListRoute = (app) => {
         },
         current: {
           name: requestPath ? path.basename(absolutePath) : ROOT_NAME,
-          path: requestPath,
-          mtime: dirStats.mtime.toISOString(),
-          mtimeMs: dirStats.mtimeMs
+          path: requestPath
         },
         stats,
         entries,
         children
       });
     } catch (error) {
+      if (error.code === 'ENOENT') {
+        res.status(404).json({ error: 'Not found' });
+        return;
+      }
       res.status(500).json({ error: 'Failed to read directory', detail: error.message });
     }
   });

@@ -1,0 +1,35 @@
+.breadcrumbs-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 6px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.crumb {
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.crumb:hover {
+  background: var(--panel-2);
+}
+
+.crumb-separator {
+  margin: 0 6px;
+  color: var(--muted);
+}

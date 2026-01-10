@@ -1,4 +1,5 @@
 import React from 'react';
+import './Icons.css';
 
 export const IconFolder = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true" className="icon">

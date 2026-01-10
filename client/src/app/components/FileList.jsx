@@ -1,6 +1,7 @@
 import React from 'react';
-import { buildFileUrl, buildThumbUrl } from '../lib/api.js';
-import { formatSize } from '../lib/format.js';
+import '../../styles/components/media-list.css';
+import { buildFileUrl, buildThumbUrl } from '../../lib/api.js';
+import { formatSize } from '../../lib/format.js';
 import { iconForEntry } from './Icons.jsx';
 
 const FileList = ({

@@ -1,0 +1,15 @@
+:root {
+  color-scheme: light;
+  --bg: #f2f2f2;
+  --panel: #ffffff;
+  --panel-2: #f7f7f7;
+  --accent: #7b1f1f;
+  --text: #1e1e1e;
+  --muted: #6a6a6a;
+  --border: #d7d7d7;
+  --shadow: none;
+  --radius-lg: 6px;
+  --radius-md: 6px;
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  --font-serif: 'Times New Roman', Times, serif;
+}

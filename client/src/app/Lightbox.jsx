@@ -1,0 +1,255 @@
+import React, { useEffect, useState } from 'react';
+import { buildFileUrl } from '../lib/api.js';
+import { formatSize } from '../lib/format.js';
+import { isViewableEntry } from '../lib/fileTypes.js';
+import { iconForEntry } from './components/index.js';
+
+const Lightbox = ({
+  open,
+  selectedEntry,
+  viewableEntries,
+  activeIndex,
+  onClose,
+  onPrev,
+  onNext
+}) => {
+  const [mediaLoading, setMediaLoading] = useState(false);
+  const [mediaMeta, setMediaMeta] = useState({ width: null, height: null, duration: null });
+  const [textPreview, setTextPreview] = useState({
+    status: 'idle',
+    content: '',
+    truncated: false,
+    error: ''
+  });
+
+  const shouldShowDimensions = selectedEntry?.type === 'image' || selectedEntry?.type === 'video';
+  const hasDimensions = Number.isFinite(mediaMeta.width) && Number.isFinite(mediaMeta.height);
+  const placeholderDimensions = '-- × --';
+
+  useEffect(() => {
+    if (!open) return;
+    if (selectedEntry?.isDir) {
+      onClose();
+      return;
+    }
+    if (selectedEntry?.type === 'image' || selectedEntry?.type === 'video') {
+      setMediaLoading(true);
+    } else {
+      setMediaLoading(false);
+    }
+    setMediaMeta({ width: null, height: null, duration: null });
+  }, [open, selectedEntry, onClose]);
+
+  useEffect(() => {
+    if (!open || !selectedEntry || selectedEntry.type !== 'text') {
+      setTextPreview({ status: 'idle', content: '', truncated: false, error: '' });
+      return undefined;
+    }
+    let isActive = true;
+    const loadText = async () => {
+      setTextPreview({ status: 'loading', content: '', truncated: false, error: '' });
+      try {
+        const response = await fetch(buildFileUrl(selectedEntry.path), {
+          headers: { Range: 'bytes=0-65535' }
+        });
+        if (!response.ok) {
+          throw new Error('Failed to load text preview');
+        }
+        const content = await response.text();
+        if (!isActive) return;
+        setTextPreview({
+          status: 'ready',
+          content,
+          truncated: response.status === 206,
+          error: ''
+        });
+      } catch (error) {
+        if (!isActive) return;
+        setTextPreview({
+          status: 'error',
+          content: '',
+          truncated: false,
+          error: error.message
+        });
+      }
+    };
+    loadText();
+    return () => {
+      isActive = false;
+    };
+  }, [open, selectedEntry]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const handleKey = (event) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+      if (event.key === 'ArrowLeft') {
+        onPrev();
+      }
+      if (event.key === 'ArrowRight') {
+        onNext();
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [open, onClose, onPrev, onNext]);
+
+  if (!open || !selectedEntry || selectedEntry.isDir) return null;
+
+  return (
+    <div className="lightbox" role="dialog" aria-modal="true" onClick={onClose}>
+      <div className="lightbox-stage">
+        <div
+          className={`lightbox-body${selectedEntry.type === 'document' ? ' is-document' : ''}`}
+          onClick={(event) => event.stopPropagation()}
+        >
+          {(selectedEntry.type === 'image' || selectedEntry.type === 'video') && (
+            <div className={`lightbox-media${mediaLoading ? ' is-loading' : ''}`}>
+              {mediaLoading && <div className="media-loader" aria-hidden="true" />}
+              {selectedEntry.type === 'image' && (
+                <img
+                  src={buildFileUrl(selectedEntry.path)}
+                  alt={selectedEntry.name}
+                  onLoad={(event) => {
+                    setMediaLoading(false);
+                    setMediaMeta({
+                      width: event.currentTarget.naturalWidth,
+                      height: event.currentTarget.naturalHeight,
+                      duration: null
+                    });
+                  }}
+                />
+              )}
+              {selectedEntry.type === 'video' && (
+                <video
+                  controls
+                  src={buildFileUrl(selectedEntry.path)}
+                  preload="metadata"
+                  onLoadedMetadata={(event) => {
+                    setMediaMeta({
+                      width: event.currentTarget.videoWidth,
+                      height: event.currentTarget.videoHeight,
+                      duration: event.currentTarget.duration
+                    });
+                  }}
+                  onLoadedData={() => setMediaLoading(false)}
+                />
+              )}
+            </div>
+          )}
+          {selectedEntry.type === 'audio' && (
+            <audio
+              controls
+              src={buildFileUrl(selectedEntry.path)}
+              preload="metadata"
+              onLoadedMetadata={(event) => {
+                setMediaMeta({
+                  width: null,
+                  height: null,
+                  duration: event.currentTarget.duration
+                });
+              }}
+            />
+          )}
+          {selectedEntry.type === 'document' && (
+            <iframe
+              className="lightbox-iframe"
+              src={buildFileUrl(selectedEntry.path)}
+              title={selectedEntry.name}
+            />
+          )}
+          {selectedEntry.type === 'text' && (
+            <div className="lightbox-text">
+              {textPreview.status === 'loading' && <div>Loading preview...</div>}
+              {textPreview.status === 'error' && (
+                <div className="lightbox-error">{textPreview.error}</div>
+              )}
+              {textPreview.status === 'ready' && (
+                <>
+                  {textPreview.truncated && <div className="lightbox-note">Showing first 64 KB.</div>}
+                  <pre>{textPreview.content}</pre>
+                </>
+              )}
+            </div>
+          )}
+          {!isViewableEntry(selectedEntry) && (
+            <div className="lightbox-unknown">
+              <div className="lightbox-unknown-title">Preview unavailable</div>
+              <div className="lightbox-unknown-copy">
+                This file type isn't supported. Use Download to open it.
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="lightbox-toolbar" onClick={(event) => event.stopPropagation()}>
+        <div className="lightbox-meta">
+          <div className="lightbox-meta-left">
+            <span className="lightbox-type-icon" aria-hidden="true">
+              {iconForEntry(selectedEntry)}
+            </span>
+            <div className="lightbox-meta-text">
+              <span className="lightbox-name">{selectedEntry.name}</span>
+              <div className="lightbox-meta-sub">
+                {Number.isFinite(selectedEntry.size) && selectedEntry.size > 0 && (
+                  <span className="lightbox-size">{formatSize(selectedEntry.size)}</span>
+                )}
+                {shouldShowDimensions && (
+                  <span
+                    className={`lightbox-dimensions${hasDimensions ? '' : ' is-loading'}`}
+                    aria-hidden={!hasDimensions}
+                  >
+                    {hasDimensions
+                      ? `${mediaMeta.width} × ${mediaMeta.height}`
+                      : placeholderDimensions}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="lightbox-controls">
+          <div className="lightbox-nav-group" role="group" aria-label="Navigation">
+            {activeIndex >= 0 && viewableEntries.length > 0 && (
+              <span className="lightbox-count">
+                {activeIndex + 1} / {viewableEntries.length}
+              </span>
+            )}
+            <button
+              type="button"
+              className="lightbox-nav"
+              onClick={onPrev}
+              disabled={activeIndex <= 0}
+              aria-label="Previous item"
+            >
+              ◀
+            </button>
+            <button
+              type="button"
+              className="lightbox-nav"
+              onClick={onNext}
+              disabled={activeIndex >= viewableEntries.length - 1}
+              aria-label="Next item"
+            >
+              ▶
+            </button>
+          </div>
+          <a
+            className="lightbox-download"
+            href={buildFileUrl(selectedEntry.path)}
+            download={selectedEntry.name}
+          >
+            Download
+          </a>
+          <button type="button" className="lightbox-close" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Lightbox;

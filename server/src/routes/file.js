@@ -29,6 +29,17 @@ export const registerFileRoute = (app) => {
       const mimeType = mime.lookup(absolutePath) || 'application/octet-stream';
       const range = req.headers.range;
 
+      if (stats.size === 0) {
+        res.writeHead(200, {
+          'Content-Length': 0,
+          'Content-Type': mimeType,
+          'Accept-Ranges': 'bytes',
+          'Cache-Control': 'public, max-age=3600'
+        });
+        res.end();
+        return;
+      }
+
       if (range) {
         const [startRaw, endRaw] = range.replace(/bytes=/, '').split('-');
         const start = startRaw ? Number(startRaw) : 0;
@@ -42,7 +53,6 @@ export const registerFileRoute = (app) => {
           start < 0 ||
           end < 0 ||
           start >= stats.size ||
-          end >= stats.size ||
           clampedStart > clampedEnd
         ) {
           res.status(416).setHeader('Content-Range', `bytes */${stats.size}`).end();

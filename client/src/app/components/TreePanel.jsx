@@ -1,4 +1,5 @@
 import React from 'react';
+import './TreePanel.css';
 import { IconFolder } from './Icons.jsx';
 
 const TreeNode = ({ node, tree, currentPath, onToggle, onNavigate }) => {
@@ -57,14 +58,14 @@ const TreeNode = ({ node, tree, currentPath, onToggle, onNavigate }) => {
   );
 };
 
-const TreePanel = ({ tree, currentPath, rootPath, onToggle, onNavigate }) => {
+const TreePanel = ({ tree, currentPath, rootPath, onToggle, onNavigate, hideHeader = false }) => {
   const rootNode = tree[rootPath];
   if (!rootNode) return null;
   return (
     <div className="panel tree-panel">
       <div className="panel-header">
         <div>
-          <span className="panel-title">Archive</span>
+          {!hideHeader && <span className="panel-title">Archive</span>}
         </div>
       </div>
       <div className="panel-body tree-scroll">

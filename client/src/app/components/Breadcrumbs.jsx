@@ -1,4 +1,5 @@
 import React from 'react';
+import '../../styles/components/navigation.css';
 
 const Breadcrumbs = ({ rootLabel, path, onNavigate }) => {
   const segments = path ? path.split('/') : [];
