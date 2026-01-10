@@ -1,7 +1,5 @@
-import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { Worker } from 'node:worker_threads';
 import {
   EXCLUDE_PATTERNS,
@@ -10,9 +8,15 @@ import {
   THUMB_EXT,
   THUMB_SIZES
 } from '../config.js';
+import {
+  HASH_CACHE_FILE,
+  getCachedHash,
+  onHashUpdate,
+  setHashEntry
+} from './hash-cache.js';
 
-const HASH_CACHE = new Map();
 let thumbnailWorker = null;
+let unsubscribeHashUpdates = null;
 
 const ensureThumbDir = async () => {
   try {
@@ -22,27 +26,10 @@ const ensureThumbDir = async () => {
   }
 };
 
-const hashFile = (absolutePath) =>
-  new Promise((resolve, reject) => {
-    const hash = crypto.createHash('sha1');
-    const stream = fs.createReadStream(absolutePath);
-    stream.on('error', reject);
-    stream.on('data', (chunk) => hash.update(chunk));
-    stream.on('end', () => resolve(hash.digest('hex')));
-  });
-
-export const getCachedHash = async (relativePath, absolutePath, stats) => {
-  const cached = HASH_CACHE.get(relativePath);
-  if (cached && cached.mtimeMs === stats.mtimeMs && cached.size === stats.size) {
-    return cached.hash;
-  }
-  const hash = await hashFile(absolutePath);
-  HASH_CACHE.set(relativePath, { hash, mtimeMs: stats.mtimeMs, size: stats.size });
-  return hash;
-};
-
 export const getThumbName = (hash, variant, originalName) =>
   `${hash}-${variant}-${originalName}${THUMB_EXT}`;
+
+export { getCachedHash };
 
 export const getThumbPath = (hash, variant, originalName) =>
   path.join(THUMB_DIR, getThumbName(hash, variant, originalName));
@@ -61,17 +48,23 @@ export const startThumbnailWorker = async () => {
         thumbDir: THUMB_DIR,
         excludePatterns: EXCLUDE_PATTERNS,
         sizes: THUMB_SIZES,
-        thumbExt: THUMB_EXT
+        thumbExt: THUMB_EXT,
+        cacheFile: HASH_CACHE_FILE
       }
     });
     thumbnailWorker.on('message', (message) => {
       if (message?.type === 'hashed') {
-        HASH_CACHE.set(message.path, {
+        setHashEntry(message.path, {
           hash: message.hash,
           mtimeMs: message.mtimeMs,
           size: message.size
-        });
+        }, { emit: false });
       }
+    });
+    unsubscribeHashUpdates?.();
+    unsubscribeHashUpdates = onHashUpdate((entry) => {
+      if (!thumbnailWorker || !entry?.path) return;
+      thumbnailWorker.postMessage({ type: 'hash-update', entry });
     });
     thumbnailWorker.on('error', (error) => {
       console.error('Thumbnail worker error', error);

@@ -2,15 +2,15 @@ import React from 'react';
 import './TreePanel.css';
 import { IconFolder } from './Icons.jsx';
 
-const TreeNode = ({ node, tree, currentPath, onToggle, onNavigate }) => {
+const TreeNode = ({ node, tree, currentPath, onToggle, onNavigate, isRoot = false }) => {
   const isLoaded = Array.isArray(node.children);
   const hasChildren = isLoaded && node.children.length > 0;
   const canExpand = !isLoaded || hasChildren;
   const isActive = node.path === currentPath;
   return (
-    <div className={`tree-node ${isActive ? 'active' : ''}`}>
+    <div className={`tree-node ${isRoot ? 'root-node' : ''} ${isActive ? 'active' : ''}`}>
       <div className="tree-node-row">
-        {canExpand ? (
+        {!isRoot && canExpand ? (
           <button
             className={`tree-toggle ${node.expanded ? 'open' : ''}`}
             type="button"
@@ -26,7 +26,7 @@ const TreeNode = ({ node, tree, currentPath, onToggle, onNavigate }) => {
               <polyline points="6,4 10,8 6,12" />
             </svg>
           </button>
-        ) : (
+        ) : isRoot ? null : (
           <span className="tree-toggle placeholder" aria-hidden="true" />
         )}
         <button className="tree-label" type="button" onClick={() => onNavigate(node.path)}>
@@ -36,7 +36,7 @@ const TreeNode = ({ node, tree, currentPath, onToggle, onNavigate }) => {
           <span>{node.name || 'Archive'}</span>
         </button>
       </div>
-      {node.expanded && hasChildren && (
+      {(isRoot || node.expanded) && hasChildren && (
         <div className="tree-children">
           {node.children.map((childPath) => {
             const childNode = tree[childPath];
@@ -49,6 +49,7 @@ const TreeNode = ({ node, tree, currentPath, onToggle, onNavigate }) => {
                 currentPath={currentPath}
                 onToggle={onToggle}
                 onNavigate={onNavigate}
+                isRoot={false}
               />
             );
           })}
@@ -75,6 +76,7 @@ const TreePanel = ({ tree, currentPath, rootPath, onToggle, onNavigate, hideHead
           currentPath={currentPath}
           onToggle={onToggle}
           onNavigate={onNavigate}
+          isRoot
         />
       </div>
     </div>

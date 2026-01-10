@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { buildFileUrl } from '../lib/api.js';
 import { formatSize } from '../lib/format.js';
 import { isViewableEntry } from '../lib/fileTypes.js';
@@ -21,6 +21,8 @@ const Lightbox = ({
     truncated: false,
     error: ''
   });
+  const imageRef = useRef(null);
+  const videoRef = useRef(null);
 
   const shouldShowDimensions = selectedEntry?.type === 'image' || selectedEntry?.type === 'video';
   const hasDimensions = Number.isFinite(mediaMeta.width) && Number.isFinite(mediaMeta.height);
@@ -40,6 +42,26 @@ const Lightbox = ({
     }
     setMediaMeta({ width: null, height: null, duration: null });
   }, [open, selectedEntry, onClose]);
+
+  useEffect(() => {
+    if (!open || !selectedEntry) return;
+    if (selectedEntry.type === 'image' && imageRef.current?.complete) {
+      setMediaLoading(false);
+      setMediaMeta({
+        width: imageRef.current.naturalWidth,
+        height: imageRef.current.naturalHeight,
+        duration: null
+      });
+    }
+    if (selectedEntry.type === 'video' && videoRef.current?.readyState >= 2) {
+      setMediaLoading(false);
+      setMediaMeta({
+        width: videoRef.current.videoWidth,
+        height: videoRef.current.videoHeight,
+        duration: videoRef.current.duration
+      });
+    }
+  }, [open, selectedEntry]);
 
   useEffect(() => {
     if (!open || !selectedEntry || selectedEntry.type !== 'text') {
@@ -117,6 +139,8 @@ const Lightbox = ({
               {mediaLoading && <div className="media-loader" aria-hidden="true" />}
               {selectedEntry.type === 'image' && (
                 <img
+                  key={selectedEntry.path}
+                  ref={imageRef}
                   src={buildFileUrl(selectedEntry.path)}
                   alt={selectedEntry.name}
                   onLoad={(event) => {
@@ -127,11 +151,14 @@ const Lightbox = ({
                       duration: null
                     });
                   }}
+                  onError={() => setMediaLoading(false)}
                 />
               )}
               {selectedEntry.type === 'video' && (
                 <video
                   controls
+                  key={selectedEntry.path}
+                  ref={videoRef}
                   src={buildFileUrl(selectedEntry.path)}
                   preload="metadata"
                   onLoadedMetadata={(event) => {
@@ -142,6 +169,7 @@ const Lightbox = ({
                     });
                   }}
                   onLoadedData={() => setMediaLoading(false)}
+                  onError={() => setMediaLoading(false)}
                 />
               )}
             </div>

@@ -4,6 +4,7 @@ import { FileList, SortButtons } from './components/index.js';
 const DirectoryPanel = ({
   directory,
   rootLabel,
+  currentPathName,
   status,
   lastGoodPath,
   onNavigate,
@@ -17,6 +18,9 @@ const DirectoryPanel = ({
   selectedPath
 }) => {
   const hasError = Boolean(status.error);
+  const titleText = hasError
+    ? ''
+    : directory?.current?.name || currentPathName || rootLabel;
   const subLabel = hasError
     ? ''
     : directory
@@ -26,7 +30,7 @@ const DirectoryPanel = ({
     <div className="panel list-panel">
       <div className="panel-header">
         <div>
-          <span className="panel-title">{hasError ? '' : directory?.current?.name || rootLabel}</span>
+          <span className="panel-title">{titleText}</span>
           <span className="panel-sub">{subLabel}</span>
         </div>
         {!hasError && <SortButtons sortKey={sortKey} sortDir={sortDir} onSortClick={onSortClick} />}

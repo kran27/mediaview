@@ -6,6 +6,7 @@ import '../styles/components/header.css';
 import '../styles/components/animations.css';
 import { Breadcrumbs, TreePanel } from './components/index.js';
 import { isViewableEntry } from '../lib/fileTypes.js';
+import { getBasename } from '../lib/format.js';
 import { readUrlState, setUrlState } from '../lib/urlState.js';
 import { useDirectoryData } from './hooks/useDirectoryData.js';
 import AppHeader from './AppHeader.jsx';
@@ -38,6 +39,7 @@ export default function App() {
   const didInitRef = useRef(false);
 
   const rootLabel = directory?.root?.name || 'Archive';
+  const currentPathName = currentPath ? getBasename(currentPath) : rootLabel;
   const selectedEntry = selected && directory?.entries.find((entry) => entry.path === selected.path)
     ? selected
     : null;
@@ -167,6 +169,7 @@ export default function App() {
       <DirectoryPanel
         directory={directory}
         rootLabel={rootLabel}
+        currentPathName={currentPathName}
         status={status}
         lastGoodPath={lastGoodPath}
         onNavigate={navigateTo}

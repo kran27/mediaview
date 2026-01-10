@@ -2,7 +2,20 @@ import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import mime from 'mime-types';
 import { isExcludedPath } from '../lib/exclude.js';
+import { getCachedHash } from '../lib/hash-cache.js';
 import { normalizeRequestPath, resolveSafePath } from '../lib/paths.js';
+
+const buildEtag = (hash) => `"sha256-${hash}"`;
+
+const matchesEtag = (headerValue, etag) => {
+  if (!headerValue) return false;
+  const candidates = headerValue
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .map((value) => (value.startsWith('W/') ? value.slice(2) : value));
+  return candidates.includes('*') || candidates.includes(etag);
+};
 
 export const registerFileRoute = (app) => {
   app.get('/api/file', async (req, res) => {
@@ -27,6 +40,16 @@ export const registerFileRoute = (app) => {
       }
 
       const mimeType = mime.lookup(absolutePath) || 'application/octet-stream';
+      const hash = await getCachedHash(requestPath, absolutePath, stats);
+      const etag = buildEtag(hash);
+      const cacheControl = 'public, max-age=3600, must-revalidate';
+      res.setHeader('ETag', etag);
+      res.setHeader('Last-Modified', stats.mtime.toUTCString());
+      res.setHeader('Cache-Control', cacheControl);
+      if (matchesEtag(req.headers['if-none-match'], etag)) {
+        res.status(304).end();
+        return;
+      }
       const range = req.headers.range;
 
       if (stats.size === 0) {
@@ -34,7 +57,7 @@ export const registerFileRoute = (app) => {
           'Content-Length': 0,
           'Content-Type': mimeType,
           'Accept-Ranges': 'bytes',
-          'Cache-Control': 'public, max-age=3600'
+          'Cache-Control': cacheControl
         });
         res.end();
         return;
@@ -65,7 +88,7 @@ export const registerFileRoute = (app) => {
           'Accept-Ranges': 'bytes',
           'Content-Length': chunkSize,
           'Content-Type': mimeType,
-          'Cache-Control': 'public, max-age=3600'
+          'Cache-Control': cacheControl
         });
         fs.createReadStream(absolutePath, { start: clampedStart, end: clampedEnd }).pipe(res);
         return;
@@ -75,7 +98,7 @@ export const registerFileRoute = (app) => {
         'Content-Length': stats.size,
         'Content-Type': mimeType,
         'Accept-Ranges': 'bytes',
-        'Cache-Control': 'public, max-age=3600'
+        'Cache-Control': cacheControl
       });
       fs.createReadStream(absolutePath).pipe(res);
     } catch (error) {

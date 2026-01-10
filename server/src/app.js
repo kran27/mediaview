@@ -1,5 +1,6 @@
 import express from 'express';
 import { registerFileRoute } from './routes/file.js';
+import { registerHashCacheRoute } from './routes/hash-cache.js';
 import { registerHealthRoute } from './routes/health.js';
 import { registerListRoute } from './routes/list.js';
 import { registerTreeRoute } from './routes/tree.js';
@@ -20,6 +21,7 @@ export const createApp = () => {
   });
 
   registerHealthRoute(app);
+  registerHashCacheRoute(app);
   registerListRoute(app);
   registerTreeRoute(app);
   registerThumbnailRoute(app);

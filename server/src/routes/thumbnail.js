@@ -8,6 +8,18 @@ import { isExcludedPath } from '../lib/exclude.js';
 import { normalizeRequestPath, resolveSafePath } from '../lib/paths.js';
 import { enqueueThumbnailJobs, getCachedHash, getThumbPath } from '../lib/thumbnails.js';
 
+const buildEtag = (hash, size, name) => `"thumb-${hash}-${size}-${name}"`;
+
+const matchesEtag = (headerValue, etag) => {
+  if (!headerValue) return false;
+  const candidates = headerValue
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .map((value) => (value.startsWith('W/') ? value.slice(2) : value));
+  return candidates.includes('*') || candidates.includes(etag);
+};
+
 export const registerThumbnailRoute = (app) => {
   app.get('/api/thumbnail', async (req, res) => {
     const requestPath = normalizeRequestPath(req.query.path || '');
@@ -46,9 +58,17 @@ export const registerThumbnailRoute = (app) => {
         return;
       }
       const mimeType = mime.lookup(thumbPath) || 'application/octet-stream';
+      const etag = buildEtag(hash, size, path.basename(requestPath));
+      const cacheControl = 'public, max-age=604800, immutable';
+      res.setHeader('ETag', etag);
+      res.setHeader('Cache-Control', cacheControl);
+      if (matchesEtag(req.headers['if-none-match'], etag)) {
+        res.status(304).end();
+        return;
+      }
       res.writeHead(200, {
         'Content-Type': mimeType,
-        'Cache-Control': 'public, max-age=86400'
+        'Cache-Control': cacheControl
       });
       fs.createReadStream(thumbPath).pipe(res);
     } catch (error) {

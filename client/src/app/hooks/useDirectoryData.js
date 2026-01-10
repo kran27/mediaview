@@ -22,7 +22,9 @@ export const useDirectoryData = () => {
   const lastGoodPathRef = useRef('');
   const [lastGoodPath, setLastGoodPath] = useState('');
   const resolvePathRef = useRef(0);
-  const hasFetchedTreeRef = useRef(false);
+  const treeHydratedRef = useRef(false);
+  const treePrefetchingRef = useRef(true);
+  const treeFetchRef = useRef(null);
 
   const applyTreeNodes = (nodes) => {
     if (!nodes) return;
@@ -188,17 +190,34 @@ export const useDirectoryData = () => {
         rootLabel: cached.root?.name
       });
     });
-    await Promise.all(
-      chainToFetch.map(async (chainPath) => {
-        if (cacheRef.current.has(chainPath)) return;
+
+    let index = 0;
+    while (index < chainToFetch.length) {
+      const chainPath = chainToFetch[index];
+      if (!cacheRef.current.has(chainPath)) {
         try {
           const data = await fetchList(chainPath, { background: true });
           applyListing(chainPath, data, { expand: true });
         } catch (error) {
           // ignore background failures
         }
-      })
-    );
+      }
+
+      const nextPath = chainToFetch[index + 1];
+      if (nextPath && cacheRef.current.has(nextPath)) {
+        const cachedNext = cacheRef.current.get(nextPath);
+        if (cachedNext) {
+          updateTreeWithEntries(nextPath, cachedNext.entries, {
+            expand: true,
+            rootLabel: cachedNext.root?.name
+          });
+        }
+        index += 2;
+        continue;
+      }
+
+      index += 1;
+    }
   };
 
   const expandAncestors = (pathValue, rootLabel) => {
@@ -237,10 +256,10 @@ export const useDirectoryData = () => {
 
   const loadDirectory = async (pathValue, options = {}) => {
     const { selectPath = '' } = options;
-    if (pathValue) {
-      void hydratePathChain(pathValue);
-    }
     const cached = cacheRef.current.get(pathValue);
+    if (!cached && pathValue && treeHydratedRef.current) {
+      expandAncestors(pathValue, tree['']?.name || 'Archive');
+    }
     if (cached) {
       const selection = selectPath
         ? cached.entries.find((entry) => entry.path === selectPath || entry.name === selectPath) ||
@@ -256,22 +275,22 @@ export const useDirectoryData = () => {
       setSelected(selection);
       expandAncestors(pathValue, cached.root?.name || 'Archive');
       setStatus({ loading: false, error: null });
-      void fetchList(pathValue, { force: true })
-        .then((data) => {
-          applyListing(pathValue, data, { expand: true });
-          if (currentPathRef.current === pathValue) {
-            setDirectory(data);
-            setSelected((prev) =>
-              prev && data.entries.find((entry) => entry.path === prev.path) ? prev : null
-            );
-          }
-        })
-        .catch(() => {});
+      if (pathValue) {
+        void hydratePathChain(pathValue);
+      }
       return { selection, shouldLightbox };
     }
     setStatus({ loading: true, error: null });
+    setCurrentPath(pathValue);
+    if (pathValue && treeHydratedRef.current) {
+      expandAncestors(pathValue, tree['']?.name || 'Archive');
+    }
     try {
-      const data = await fetchList(pathValue);
+      const listPromise = fetchList(pathValue);
+      if (pathValue) {
+        void hydratePathChain(pathValue);
+      }
+      const data = await listPromise;
       applyListing(pathValue, data, { expand: true });
       const selection = selectPath
         ? data.entries.find((entry) => entry.path === selectPath || entry.name === selectPath) ||
@@ -312,7 +331,12 @@ export const useDirectoryData = () => {
   const handleToggle = (pathValue) => {
     const node = tree[pathValue];
     if (!node) return;
-    if (!node.expanded && node.children === null) {
+    if (
+      !node.expanded &&
+      node.children === null &&
+      !treeHydratedRef.current &&
+      !treePrefetchingRef.current
+    ) {
       loadChildren(pathValue);
     }
     setTree((prev) => ({
@@ -339,14 +363,21 @@ export const useDirectoryData = () => {
 
   useEffect(() => {
     let isActive = true;
-    if (hasFetchedTreeRef.current) return () => {};
-    hasFetchedTreeRef.current = true;
-    fetchTree()
+    if (!treeFetchRef.current) {
+      treePrefetchingRef.current = true;
+      treeFetchRef.current = fetchTree();
+    }
+    treeFetchRef.current
       .then((data) => {
         if (!isActive) return;
         applyTreeNodes(data?.nodes);
+        treeHydratedRef.current = true;
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (!isActive) return;
+        treePrefetchingRef.current = false;
+      });
     return () => {
       isActive = false;
     };
