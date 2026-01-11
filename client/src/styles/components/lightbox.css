@@ -292,6 +292,82 @@
   opacity: 0.35;
 }
 
+@media (max-width: 720px) {
+  .lightbox-toolbar {
+    height: auto;
+    padding: 10px 14px 12px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "meta nav"
+      "download close";
+    align-items: center;
+    gap: 8px 12px;
+  }
+
+  .lightbox-meta {
+    width: 100%;
+    gap: 8px;
+    font-size: 11px;
+    grid-area: meta;
+  }
+
+  .lightbox-meta-left {
+    width: 100%;
+  }
+
+  .lightbox-name {
+    white-space: normal;
+    line-height: 1.2;
+  }
+
+  .lightbox-meta-sub {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .lightbox-controls {
+    display: contents;
+  }
+
+  .lightbox-download,
+  .lightbox-close {
+    padding: 6px 10px;
+    font-size: 11px;
+    width: 100%;
+    text-align: center;
+  }
+
+  .lightbox-download {
+    grid-area: download;
+  }
+
+  .lightbox-close {
+    grid-area: close;
+  }
+
+  .lightbox-nav-group {
+    grid-area: nav;
+    justify-self: end;
+  }
+}
+
+@media (max-width: 360px) {
+  .lightbox-toolbar {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "meta"
+      "nav"
+      "download"
+      "close";
+  }
+
+  .lightbox-nav-group {
+    justify-self: center;
+    padding: 4px 0 2px;
+  }
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);

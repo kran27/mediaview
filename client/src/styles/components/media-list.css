@@ -206,12 +206,14 @@
 @media (max-width: 720px) {
   .list-header,
   .list-row {
-    grid-template-columns: 1fr;
-    gap: 6px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    padding: 8px 10px;
   }
 
   .list-cell.size {
-    text-align: left;
-    justify-self: start;
+    text-align: right;
+    justify-self: end;
+    white-space: nowrap;
   }
 }

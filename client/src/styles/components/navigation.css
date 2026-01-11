@@ -4,32 +4,134 @@
   justify-content: space-between;
   margin: 0;
   gap: 16px;
-  flex-wrap: wrap;
-  padding: 6px 16px;
+  flex-wrap: nowrap;
+  padding: 6px 12px;
   background: var(--panel);
   border-bottom: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+
+@media (max-width: 900px) {
+  .breadcrumbs-bar {
+    padding: 10px 12px;
+  }
+}
+
+.breadcrumbs-scroll {
+  display: block;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 0 4px;
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.breadcrumbs-scroll.has-overflow {
+  --fade-left: transparent;
+  --fade-right: transparent;
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    var(--fade-left) 0,
+    #000 18px,
+    #000 calc(100% - 18px),
+    var(--fade-right) 100%
+  );
+  mask-image: linear-gradient(
+    90deg,
+    var(--fade-left) 0,
+    #000 18px,
+    #000 calc(100% - 18px),
+    var(--fade-right) 100%
+  );
+}
+
+.breadcrumbs-scroll.has-overflow.fade-left {
+  --fade-left: transparent;
+}
+
+.breadcrumbs-scroll.has-overflow.fade-right {
+  --fade-right: transparent;
+}
+
+.breadcrumbs-scroll.has-overflow:not(.fade-left) {
+  --fade-left: #000;
+}
+
+.breadcrumbs-scroll.has-overflow:not(.fade-right) {
+  --fade-right: #000;
+}
+
+.breadcrumbs-scroll::-webkit-scrollbar {
+  display: none;
 }
 
 .breadcrumbs {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
+  gap: 0;
+  white-space: nowrap;
+}
+
+.crumb-segment {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
 }
 
 .crumb {
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: 999px;
   background: transparent;
   color: var(--text);
   font-weight: 500;
+}
+
+.crumb.current {
+  font-weight: 700;
+  color: var(--accent);
 }
 
 .crumb:hover {
   background: var(--panel-2);
 }
 
+.breadcrumbs-bar.tree-hidden .crumb {
+  font-size: 15px;
+}
+
+.breadcrumbs-bar.tree-hidden .crumb.current {
+  background: rgba(123, 31, 31, 0.12);
+}
+
+.breadcrumbs-bar.tree-hidden .crumb.current:hover {
+  background: rgba(123, 31, 31, 0.16);
+}
+
 .crumb-separator {
   margin: 0 6px;
   color: var(--muted);
+}
+
+@media (max-width: 720px) {
+  .breadcrumbs {
+    gap: 0;
+  }
+
+  .crumb-segment {
+    gap: 0;
+  }
+
+  .crumb {
+    padding: 2px 4px;
+    font-size: 12px;
+  }
+
+  .crumb-separator {
+    margin: 0 4px;
+  }
 }

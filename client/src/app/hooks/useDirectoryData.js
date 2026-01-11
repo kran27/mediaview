@@ -162,8 +162,6 @@ export const useDirectoryData = () => {
       let compare = 0;
       if (sortKey === 'name') {
         compare = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
-      } else if (sortKey === 'mtime') {
-        compare = a.mtimeMs - b.mtimeMs;
       } else if (sortKey === 'size') {
         compare = (a.size || 0) - (b.size || 0);
       }

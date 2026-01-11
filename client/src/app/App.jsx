@@ -36,6 +36,7 @@ export default function App() {
     lastGoodPath
   } = useDirectoryData();
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [isTreeHidden, setIsTreeHidden] = useState(false);
   const didInitRef = useRef(false);
 
   const rootLabel = directory?.root?.name || 'Archive';
@@ -136,6 +137,18 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePop);
   }, []);
 
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 900px)');
+    const handleChange = (event) => setIsTreeHidden(event.matches);
+    setIsTreeHidden(mediaQuery.matches);
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    }
+    mediaQuery.addListener(handleChange);
+    return () => mediaQuery.removeListener(handleChange);
+  }, []);
+
   return (
     <div className="page">
       <AppHeader
@@ -148,7 +161,7 @@ export default function App() {
         onSearchChange={setSearch}
       />
 
-      <div className="breadcrumbs-bar">
+      <div className={`breadcrumbs-bar${isTreeHidden ? ' tree-hidden' : ''}`}>
         <Breadcrumbs
           rootLabel={rootLabel}
           path={status.error ? lastGoodPath : currentPath}

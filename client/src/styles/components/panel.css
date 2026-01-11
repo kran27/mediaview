@@ -48,10 +48,22 @@
   text-overflow: ellipsis;
 }
 
+@media (max-width: 720px) {
+  .list-panel .panel-title {
+    display: none;
+  }
+}
+
 .panel-body {
   padding: 0;
   flex: 1;
   min-height: 0;
+}
+
+@media (max-width: 900px) {
+  .panel.tree-panel {
+    display: none;
+  }
 }
 
 .state {

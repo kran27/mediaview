@@ -157,6 +157,7 @@ const Lightbox = ({
               {selectedEntry.type === 'video' && (
                 <video
                   controls
+                  autoPlay
                   key={selectedEntry.path}
                   ref={videoRef}
                   src={buildFileUrl(selectedEntry.path)}
@@ -177,6 +178,7 @@ const Lightbox = ({
           {selectedEntry.type === 'audio' && (
             <audio
               controls
+              autoPlay
               src={buildFileUrl(selectedEntry.path)}
               preload="metadata"
               onLoadedMetadata={(event) => {
