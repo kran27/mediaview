@@ -126,6 +126,10 @@
   height: 100%;
 }
 
+.layout.zoom-sm .grid-card {
+  padding: 6px;
+}
+
 .grid-card.selected,
 .grid-card:hover {
   border-color: rgba(123, 31, 31, 0.35);
@@ -212,8 +216,17 @@
   .list-header,
   .list-row {
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 10px;
-    padding: 8px 10px;
+    gap: 8px;
+    padding: 6px 8px;
+  }
+
+  .grid {
+    gap: 8px;
+  }
+
+  .grid-card {
+    padding: 10px;
+    gap: 6px;
   }
 
   .list-cell.size {

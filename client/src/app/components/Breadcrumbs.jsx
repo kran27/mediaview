@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import '../../styles/components/navigation.css';
 
 const Breadcrumbs = ({ rootLabel, path, onNavigate }) => {
@@ -29,10 +29,16 @@ const Breadcrumbs = ({ rootLabel, path, onNavigate }) => {
     };
   }, [path, rootLabel]);
 
+  const isRootCurrent = !path;
+
   return (
     <div className="breadcrumbs-scroll" ref={scrollRef}>
       <div className="breadcrumbs">
-        <button className="crumb" type="button" onClick={() => onNavigate('')}>
+        <button
+          className={`crumb ${isRootCurrent ? 'current' : ''}`}
+          type="button"
+          onClick={() => onNavigate('')}
+        >
           {rootLabel}
         </button>
         {segments.map((segment, index) => {

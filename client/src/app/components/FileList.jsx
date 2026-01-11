@@ -1,4 +1,3 @@
-import React from 'react';
 import '../../styles/components/media-list.css';
 import { buildFileUrl, buildThumbUrl } from '../../lib/api.js';
 import { formatSize } from '../../lib/format.js';

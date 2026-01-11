@@ -3,7 +3,7 @@ import path from 'node:path';
 import { ROOT_NAME } from '../config.js';
 import { readDirectory, buildStats } from '../lib/directory.js';
 import { isExcludedPath } from '../lib/exclude.js';
-import { normalizeRequestPath, resolveSafePath } from '../lib/paths.js';
+import { resolveSafePath, sanitizeRequestPath } from '../lib/paths.js';
 import { enqueueThumbnailJobs } from '../lib/thumbnails.js';
 
 const collectThumbPaths = (entries) =>
@@ -12,13 +12,29 @@ const collectThumbPaths = (entries) =>
     .map((entry) => entry.path);
 
 export const registerListRoute = (app) => {
-  const decodePathSegments = (rawPath) =>
-    rawPath
-      .split('/')
-      .filter(Boolean)
-      .map((segment) => decodeURIComponent(segment))
-      .join('/');
+  const decodePathSegments = (rawPath) => {
+    if (Array.isArray(rawPath)) {
+      return rawPath.join('/');
+    }
+    try {
+      return rawPath
+        .split('/')
+        .filter(Boolean)
+        .map((segment) => {
+          if (!/%[0-9A-Fa-f]{2}/.test(segment)) return segment;
+          return decodeURIComponent(segment);
+        })
+        .join('/');
+    } catch {
+      const decodeError = new Error('Invalid path encoding');
+      decodeError.statusCode = 400;
+      throw decodeError;
+    }
+  };
   const getRequestPath = (req) => {
+    if (typeof req.params.path === 'string' || Array.isArray(req.params.path)) {
+      return decodePathSegments(req.params.path);
+    }
     if (typeof req.params[0] === 'string') {
       return decodePathSegments(req.params[0]);
     }
@@ -29,9 +45,10 @@ export const registerListRoute = (app) => {
   };
 
   const handleRequest = async (req, res) => {
-    const requestPath = normalizeRequestPath(getRequestPath(req));
+    let requestPath;
     let absolutePath;
     try {
+      requestPath = sanitizeRequestPath(getRequestPath(req));
       if (isExcludedPath(requestPath)) {
         res.status(404).json({ error: 'Not found' });
         return;
@@ -59,7 +76,7 @@ export const registerListRoute = (app) => {
           .map(async (entry) => {
             try {
               children[entry.path] = await readDirectory(entry.path);
-            } catch (error) {
+            } catch {
               children[entry.path] = [];
             }
           })
@@ -94,5 +111,5 @@ export const registerListRoute = (app) => {
   };
 
   app.get('/api/list', handleRequest);
-  app.get('/api/list/*', handleRequest);
+  app.get('/api/list/*path', handleRequest);
 };

@@ -3,17 +3,32 @@ import fsPromises from 'node:fs/promises';
 import mime from 'mime-types';
 import { isExcludedPath } from '../lib/exclude.js';
 import { getCachedHash } from '../lib/hash-cache.js';
-import { normalizeRequestPath, resolveSafePath } from '../lib/paths.js';
+import { resolveSafePath, sanitizeRequestPath } from '../lib/paths.js';
 
-const buildEtag = (hash) => `"sha256-${hash}"`;
-const decodePathSegments = (rawPath) =>
-  rawPath
-    .split('/')
-    .filter(Boolean)
-    .map((segment) => decodeURIComponent(segment))
-    .join('/');
+const decodePathSegments = (rawPath) => {
+  if (Array.isArray(rawPath)) {
+    return rawPath.join('/');
+  }
+  try {
+    return rawPath
+      .split('/')
+      .filter(Boolean)
+      .map((segment) => {
+        if (!/%[0-9A-Fa-f]{2}/.test(segment)) return segment;
+        return decodeURIComponent(segment);
+      })
+      .join('/');
+  } catch {
+    const decodeError = new Error('Invalid path encoding');
+    decodeError.statusCode = 400;
+    throw decodeError;
+  }
+};
 
 const getRequestPath = (req) => {
+  if (typeof req.params.path === 'string' || Array.isArray(req.params.path)) {
+    return decodePathSegments(req.params.path);
+  }
   if (typeof req.params[0] === 'string') {
     return decodePathSegments(req.params[0]);
   }
@@ -35,9 +50,10 @@ const matchesEtag = (headerValue, etag) => {
 
 export const registerFileRoute = (app) => {
   const handleRequest = async (req, res) => {
-    const requestPath = normalizeRequestPath(getRequestPath(req));
+    let requestPath;
     let absolutePath;
     try {
+      requestPath = sanitizeRequestPath(getRequestPath(req));
       if (isExcludedPath(requestPath)) {
         res.status(404).json({ error: 'Not found' });
         return;
@@ -57,7 +73,7 @@ export const registerFileRoute = (app) => {
 
       const mimeType = mime.lookup(absolutePath) || 'application/octet-stream';
       const hash = await getCachedHash(requestPath, absolutePath, stats);
-      const etag = buildEtag(hash);
+      const etag = `"${hash}"`;
       const cacheControl = 'public, max-age=3600, must-revalidate';
       res.setHeader('ETag', etag);
       res.setHeader('Last-Modified', stats.mtime.toUTCString());
@@ -123,5 +139,5 @@ export const registerFileRoute = (app) => {
   };
 
   app.get('/api/file', handleRequest);
-  app.get('/api/file/*', handleRequest);
+  app.get('/api/file/*path', handleRequest);
 };

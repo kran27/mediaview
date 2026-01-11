@@ -1,4 +1,3 @@
-import React from 'react';
 import './Icons.css';
 
 export const IconFolder = () => (

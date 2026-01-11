@@ -5,20 +5,38 @@ import mime from 'mime-types';
 import { THUMB_SIZES } from '../config.js';
 import { isThumbablePath } from '../lib/classify.js';
 import { isExcludedPath } from '../lib/exclude.js';
-import { normalizeRequestPath, resolveSafePath } from '../lib/paths.js';
+import { resolveSafePath, sanitizeRequestPath } from '../lib/paths.js';
 import { enqueueThumbnailJobs, getCachedHash, getThumbPath } from '../lib/thumbnails.js';
 
-const buildEtag = (hash, size, name) => `"thumb-${hash}-${size}-${name}"`;
-const decodePathSegments = (rawPath) =>
-  rawPath
-    .split('/')
-    .filter(Boolean)
-    .map((segment) => decodeURIComponent(segment))
-    .join('/');
+const decodePathSegments = (rawPath) => {
+  if (Array.isArray(rawPath)) {
+    return rawPath.join('/');
+  }
+  try {
+    return rawPath
+      .split('/')
+      .filter(Boolean)
+      .map((segment) => {
+        if (!/%[0-9A-Fa-f]{2}/.test(segment)) return segment;
+        return decodeURIComponent(segment);
+      })
+      .join('/');
+  } catch {
+    const decodeError = new Error('Invalid path encoding');
+    decodeError.statusCode = 400;
+    throw decodeError;
+  }
+};
 
 const parseThumbnailRequest = (req) => {
-  if (typeof req.params[0] === 'string') {
-    const decoded = decodePathSegments(req.params[0]);
+  if (typeof req.params.size === 'string' && (typeof req.params.path === 'string' || Array.isArray(req.params.path))) {
+    return {
+      requestPath: decodePathSegments(req.params.path),
+      size: req.params.size
+    };
+  }
+  if (typeof req.params.path === 'string' || Array.isArray(req.params.path)) {
+    const decoded = decodePathSegments(req.params.path);
     const segments = decoded.split('/').filter(Boolean);
     const leading = segments[0] ? segments[0].toLowerCase() : '';
     if (leading && THUMB_SIZES[leading]) {
@@ -48,9 +66,17 @@ const matchesEtag = (headerValue, etag) => {
 
 export const registerThumbnailRoute = (app) => {
   const handleRequest = async (req, res) => {
-    const parsed = parseThumbnailRequest(req);
-    const requestPath = normalizeRequestPath(parsed.requestPath || '');
-    const size = String(parsed.size || 'sm').toLowerCase();
+    let parsed;
+    let requestPath;
+    let size;
+    try {
+      parsed = parseThumbnailRequest(req);
+      requestPath = sanitizeRequestPath(parsed.requestPath || '');
+      size = String(parsed.size || 'sm').toLowerCase();
+    } catch (error) {
+      res.status(error.statusCode || 400).json({ error: error.message });
+      return;
+    }
     if (!THUMB_SIZES[size]) {
       res.status(400).json({ error: 'Invalid thumbnail size' });
       return;
@@ -85,7 +111,7 @@ export const registerThumbnailRoute = (app) => {
         return;
       }
       const mimeType = mime.lookup(thumbPath) || 'application/octet-stream';
-      const etag = buildEtag(hash, size, path.basename(requestPath));
+      const etag = `"${hash}"`;
       const cacheControl = 'public, max-age=604800, immutable';
       res.setHeader('ETag', etag);
       res.setHeader('Cache-Control', cacheControl);
@@ -104,5 +130,6 @@ export const registerThumbnailRoute = (app) => {
   };
 
   app.get('/api/thumbnail', handleRequest);
-  app.get('/api/thumbnail/*', handleRequest);
+  app.get('/api/thumbnail/:size/*path', handleRequest);
+  app.get('/api/thumbnail/*path', handleRequest);
 };

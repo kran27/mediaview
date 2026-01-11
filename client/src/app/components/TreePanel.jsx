@@ -1,4 +1,3 @@
-import React from 'react';
 import './TreePanel.css';
 import { IconFolder } from './Icons.jsx';
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import '../styles/components/layout.css';
 import '../styles/components/lightbox.css';
 import '../styles/components/navigation.css';
@@ -36,8 +36,11 @@ export default function App() {
     lastGoodPath
   } = useDirectoryData();
   const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [isTreeHidden, setIsTreeHidden] = useState(false);
-  const didInitRef = useRef(false);
+  const [isTreeHidden, setIsTreeHidden] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(max-width: 900px)').matches;
+  });
+  const loadDirectoryRef = useRef(loadDirectory);
 
   const rootLabel = directory?.root?.name || 'Archive';
   const currentPathName = currentPath ? getBasename(currentPath) : rootLabel;
@@ -53,9 +56,13 @@ export default function App() {
     return lightboxEntries.findIndex((entry) => entry.path === selectedEntry.path);
   }, [lightboxEntries, selectedEntry]);
 
-  const navigateTo = async (pathValue, options = {}) => {
+  useEffect(() => {
+    loadDirectoryRef.current = loadDirectory;
+  }, [loadDirectory]);
+
+  const navigateTo = useCallback(async (pathValue, options = {}) => {
     const { selectPath = '', updateUrl = true, replaceUrl = false } = options;
-    const { selection, shouldLightbox } = await loadDirectory(pathValue, { selectPath });
+    const { selection, shouldLightbox } = await loadDirectoryRef.current(pathValue, { selectPath });
     setLightboxOpen(shouldLightbox);
     if (updateUrl) {
       setUrlState(
@@ -66,7 +73,7 @@ export default function App() {
         { replace: replaceUrl }
       );
     }
-  };
+  }, []);
 
   const handleOpen = (entry) => {
     if (entry.isDir) {
@@ -124,8 +131,6 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (didInitRef.current) return;
-    didInitRef.current = true;
     const applyUrlState = () => {
       const urlState = readUrlState();
       const derivedPath = urlState.path;
@@ -135,12 +140,12 @@ export default function App() {
     const handlePop = () => applyUrlState();
     window.addEventListener('popstate', handlePop);
     return () => window.removeEventListener('popstate', handlePop);
-  }, []);
+  }, [navigateTo]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
     const mediaQuery = window.matchMedia('(max-width: 900px)');
     const handleChange = (event) => setIsTreeHidden(event.matches);
-    setIsTreeHidden(mediaQuery.matches);
     if (mediaQuery.addEventListener) {
       mediaQuery.addEventListener('change', handleChange);
       return () => mediaQuery.removeEventListener('change', handleChange);

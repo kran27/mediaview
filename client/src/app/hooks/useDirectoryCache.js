@@ -107,7 +107,7 @@ export const useDirectoryCache = ({ updateTreeWithEntries }) => {
         try {
           const data = await requestList(chainPath);
           applyListing(chainPath, data, { expand: true });
-        } catch (error) {
+        } catch {
           // ignore background failures
         }
       }
@@ -150,7 +150,7 @@ export const useDirectoryCache = ({ updateTreeWithEntries }) => {
         if (!shouldContinue()) return null;
         applyListing(chainPath, data, { expand: true });
         lastSuccess = chainPath;
-      } catch (error) {
+      } catch {
         break;
       }
     }

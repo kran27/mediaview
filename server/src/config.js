@@ -7,6 +7,9 @@ export const ROOT_DIR = process.env.ARCHIVE_ROOT
 export const ROOT_NAME = process.env.ARCHIVE_NAME || path.basename(ROOT_DIR);
 export const ROOT_PREFIX = ROOT_DIR.endsWith(path.sep) ? ROOT_DIR : `${ROOT_DIR}${path.sep}`;
 export const THUMB_DIR = path.join(ROOT_DIR, '.cache', 'thumbnails');
+export const CLIENT_DIST = process.env.CLIENT_DIST
+  ? path.resolve(process.env.CLIENT_DIST)
+  : path.resolve(process.cwd(), '../client/dist');
 export const THUMB_EXT = '.avif';
 export const THUMB_SIZES = {
   sm: 200,

@@ -64,6 +64,9 @@
   color: var(--muted);
   font-size: 13px;
   text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .search-label-short {
@@ -145,13 +148,11 @@
     display: none;
   }
 
-  @media (max-width: 420px) {
-    .search-label-full {
-      display: none;
-    }
+  .search-label-full {
+    display: none;
+  }
 
-    .search-label-short {
-      display: inline;
-    }
+  .search-label-short {
+    display: inline;
   }
 }

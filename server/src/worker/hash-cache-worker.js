@@ -79,7 +79,7 @@ const scanTree = async () => {
     let dirEntries;
     try {
       dirEntries = await fsPromises.readdir(absolutePath, { withFileTypes: true });
-    } catch (error) {
+    } catch {
       continue;
     }
     for (const dirent of dirEntries) {
@@ -95,7 +95,7 @@ const scanTree = async () => {
       let stats;
       try {
         stats = await fsPromises.stat(filePath);
-      } catch (error) {
+      } catch {
         continue;
       }
       const cached = cache.get(relativePath);
@@ -109,7 +109,7 @@ const scanTree = async () => {
         if (updates.length >= BATCH_SIZE) {
           flushUpdates();
         }
-      } catch (error) {
+      } catch {
         // ignore hash failures
       }
     }
@@ -146,7 +146,7 @@ const runScan = async () => {
   let result = { updatedCount: 0, removedCount: 0 };
   try {
     result = await scanTree();
-  } catch (error) {
+  } catch {
     // ignore scan failures
   }
   const finishedAt = Date.now();

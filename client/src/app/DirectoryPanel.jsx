@@ -1,4 +1,3 @@
-import React from 'react';
 import { FileList, SortButtons } from './components/index.js';
 
 const DirectoryPanel = ({

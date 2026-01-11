@@ -12,8 +12,8 @@
 .view-segment {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 10px;
+  gap: 0;
+  padding: 0;
   border-right: 1px solid var(--border);
   transition: background-color 0.2s ease;
 }
@@ -35,7 +35,7 @@
   color: var(--muted);
   font-size: 12px;
   font-weight: 600;
-  padding: 0;
+  padding: 0 10px;
   height: 100%;
   transition: color 0.2s ease;
 }
@@ -60,10 +60,17 @@
 .size-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 1px;
   border-left: 1px solid var(--border);
-  padding-left: 8px;
+  padding: 1px;
   height: 100%;
+  flex: 0 0 auto;
+  opacity: 1;
+  transform-origin: left center;
+  width: auto;
+  overflow: hidden;
+  transition: width 0.18s ease, opacity 0.18s ease, transform 0.18s ease;
+  justify-content: center;
 }
 
 .size-toggle button {
@@ -72,8 +79,10 @@
   color: var(--muted);
   font-size: 11px;
   font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 6px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0 8px;
+  border-radius: 8px;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
@@ -82,8 +91,39 @@
   color: var(--accent);
 }
 
+.view-toggle.mode-list .size-toggle {
+  width: 0;
+  padding-left: 0;
+  border-left: none;
+  opacity: 0;
+  transform: scaleX(0);
+}
+
+.view-toggle.mode-list .size-toggle button {
+  pointer-events: none;
+}
+
 @media (max-width: 720px) {
   .view-toggle {
     width: auto;
+    height: var(--control-height, 36px);
+    align-items: stretch;
+  }
+
+  .view-segment {
+    flex: 0 0 auto;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    padding: 0;
+  }
+
+  .view-button {
+    width: 100%;
+    justify-content: center;
+    height: 100%;
+    font-size: 12px;
+    padding: 0 8px;
   }
 }

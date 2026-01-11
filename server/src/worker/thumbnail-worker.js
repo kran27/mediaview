@@ -192,7 +192,7 @@ const processQueue = async () => {
       } else {
         await generateThumbnails(next);
       }
-    } catch (error) {
+    } catch {
       // Skip failures and continue processing.
     } finally {
       pending.delete(next);
@@ -209,7 +209,7 @@ const scanTree = async () => {
     let dirEntries;
     try {
       dirEntries = await fsPromises.readdir(absolutePath, { withFileTypes: true });
-    } catch (error) {
+    } catch {
       continue;
     }
     for (const dirent of dirEntries) {

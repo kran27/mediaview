@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { buildFileUrl } from '../lib/api.js';
 import { formatSize } from '../lib/format.js';
 import { isViewableEntry } from '../lib/fileTypes.js';
@@ -29,7 +29,6 @@ const Lightbox = ({
   const shouldShowDimensions = selectedEntry?.type === 'image' || selectedEntry?.type === 'video';
   const hasDimensions = Number.isFinite(mediaMeta.width) && Number.isFinite(mediaMeta.height);
   const placeholderDimensions = '-- × --';
-  const isLoadingContent = mediaLoading || textPreview.status === 'loading';
 
   useEffect(() => {
     if (!open) return;
@@ -158,22 +157,16 @@ const Lightbox = ({
   if (!open || !selectedEntry || selectedEntry.isDir) return null;
 
   return (
-    <div className="lightbox" ref={lightboxRef} role="dialog" aria-modal="true" onClick={onClose}>
+    <div className="lightbox" ref={lightboxRef} role="dialog" aria-modal="true">
+      <button type="button" className="lightbox-backdrop" onClick={onClose} aria-label="Close preview" />
       <div className="lightbox-stage">
-        <div
-          className={`lightbox-body${selectedEntry.type === 'document' ? ' is-document' : ''}`}
-          onClick={(event) => {
-            if (isLoadingContent) {
-              onClose();
-              return;
-            }
-            if (event.target === event.currentTarget) {
-              onClose();
-              return;
-            }
-            event.stopPropagation();
-          }}
-        >
+        <div className={`lightbox-body${selectedEntry.type === 'document' ? ' is-document' : ''}`}>
+          <button
+            type="button"
+            className="lightbox-body-dismiss"
+            onClick={onClose}
+            aria-label="Close preview"
+          />
           {(selectedEntry.type === 'image' || selectedEntry.type === 'video') && (
             <div className={`lightbox-media${mediaLoading ? ' is-loading' : ''}`}>
               {mediaLoading && <div className="media-loader" aria-hidden="true" />}
@@ -255,17 +248,13 @@ const Lightbox = ({
             <div className="lightbox-unknown">
               <div className="lightbox-unknown-title">Preview unavailable</div>
               <div className="lightbox-unknown-copy">
-                This file type isn't supported. Use Download to open it.
+                This file type isn&apos;t supported. Use Download to open it.
               </div>
             </div>
           )}
         </div>
       </div>
-      <div
-        className="lightbox-toolbar"
-        ref={toolbarRef}
-        onClick={(event) => event.stopPropagation()}
-      >
+      <div className="lightbox-toolbar" ref={toolbarRef}>
         <div className="lightbox-meta">
           <div className="lightbox-meta-left">
             <span className="lightbox-type-icon" aria-hidden="true">
