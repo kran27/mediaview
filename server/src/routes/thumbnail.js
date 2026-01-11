@@ -9,6 +9,32 @@ import { normalizeRequestPath, resolveSafePath } from '../lib/paths.js';
 import { enqueueThumbnailJobs, getCachedHash, getThumbPath } from '../lib/thumbnails.js';
 
 const buildEtag = (hash, size, name) => `"thumb-${hash}-${size}-${name}"`;
+const decodePathSegments = (rawPath) =>
+  rawPath
+    .split('/')
+    .filter(Boolean)
+    .map((segment) => decodeURIComponent(segment))
+    .join('/');
+
+const parseThumbnailRequest = (req) => {
+  if (typeof req.params[0] === 'string') {
+    const decoded = decodePathSegments(req.params[0]);
+    const segments = decoded.split('/').filter(Boolean);
+    const leading = segments[0] ? segments[0].toLowerCase() : '';
+    if (leading && THUMB_SIZES[leading]) {
+      return { requestPath: segments.slice(1).join('/'), size: leading };
+    }
+    const trailing = segments[segments.length - 1] ? segments[segments.length - 1].toLowerCase() : '';
+    if (trailing && THUMB_SIZES[trailing]) {
+      return { requestPath: segments.slice(0, -1).join('/'), size: trailing };
+    }
+    return { requestPath: decoded, size: String(req.query.size || 'sm') };
+  }
+  if (typeof req.query.path === 'string') {
+    return { requestPath: req.query.path, size: String(req.query.size || 'sm') };
+  }
+  return { requestPath: '', size: String(req.query.size || 'sm') };
+};
 
 const matchesEtag = (headerValue, etag) => {
   if (!headerValue) return false;
@@ -21,9 +47,10 @@ const matchesEtag = (headerValue, etag) => {
 };
 
 export const registerThumbnailRoute = (app) => {
-  app.get('/api/thumbnail', async (req, res) => {
-    const requestPath = normalizeRequestPath(req.query.path || '');
-    const size = String(req.query.size || 'sm').toLowerCase();
+  const handleRequest = async (req, res) => {
+    const parsed = parseThumbnailRequest(req);
+    const requestPath = normalizeRequestPath(parsed.requestPath || '');
+    const size = String(parsed.size || 'sm').toLowerCase();
     if (!THUMB_SIZES[size]) {
       res.status(400).json({ error: 'Invalid thumbnail size' });
       return;
@@ -74,5 +101,8 @@ export const registerThumbnailRoute = (app) => {
     } catch (error) {
       res.status(500).json({ error: 'Failed to load thumbnail', detail: error.message });
     }
-  });
+  };
+
+  app.get('/api/thumbnail', handleRequest);
+  app.get('/api/thumbnail/*', handleRequest);
 };

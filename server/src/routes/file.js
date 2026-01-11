@@ -6,6 +6,22 @@ import { getCachedHash } from '../lib/hash-cache.js';
 import { normalizeRequestPath, resolveSafePath } from '../lib/paths.js';
 
 const buildEtag = (hash) => `"sha256-${hash}"`;
+const decodePathSegments = (rawPath) =>
+  rawPath
+    .split('/')
+    .filter(Boolean)
+    .map((segment) => decodeURIComponent(segment))
+    .join('/');
+
+const getRequestPath = (req) => {
+  if (typeof req.params[0] === 'string') {
+    return decodePathSegments(req.params[0]);
+  }
+  if (typeof req.query.path === 'string') {
+    return req.query.path;
+  }
+  return '';
+};
 
 const matchesEtag = (headerValue, etag) => {
   if (!headerValue) return false;
@@ -18,8 +34,8 @@ const matchesEtag = (headerValue, etag) => {
 };
 
 export const registerFileRoute = (app) => {
-  app.get('/api/file', async (req, res) => {
-    const requestPath = normalizeRequestPath(req.query.path || '');
+  const handleRequest = async (req, res) => {
+    const requestPath = normalizeRequestPath(getRequestPath(req));
     let absolutePath;
     try {
       if (isExcludedPath(requestPath)) {
@@ -104,5 +120,8 @@ export const registerFileRoute = (app) => {
     } catch (error) {
       res.status(500).json({ error: 'Failed to stream file', detail: error.message });
     }
-  });
+  };
+
+  app.get('/api/file', handleRequest);
+  app.get('/api/file/*', handleRequest);
 };

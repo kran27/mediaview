@@ -12,8 +12,24 @@ const collectThumbPaths = (entries) =>
     .map((entry) => entry.path);
 
 export const registerListRoute = (app) => {
-  app.get('/api/list', async (req, res) => {
-    const requestPath = normalizeRequestPath(req.query.path || '');
+  const decodePathSegments = (rawPath) =>
+    rawPath
+      .split('/')
+      .filter(Boolean)
+      .map((segment) => decodeURIComponent(segment))
+      .join('/');
+  const getRequestPath = (req) => {
+    if (typeof req.params[0] === 'string') {
+      return decodePathSegments(req.params[0]);
+    }
+    if (typeof req.query.path === 'string') {
+      return req.query.path;
+    }
+    return '';
+  };
+
+  const handleRequest = async (req, res) => {
+    const requestPath = normalizeRequestPath(getRequestPath(req));
     let absolutePath;
     try {
       if (isExcludedPath(requestPath)) {
@@ -75,5 +91,8 @@ export const registerListRoute = (app) => {
       }
       res.status(500).json({ error: 'Failed to read directory', detail: error.message });
     }
-  });
+  };
+
+  app.get('/api/list', handleRequest);
+  app.get('/api/list/*', handleRequest);
 };

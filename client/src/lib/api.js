@@ -1,7 +1,18 @@
 export const API_BASE = import.meta.env.VITE_API_BASE || '';
 
-export const buildFileUrl = (pathValue) =>
-  `${API_BASE}/api/file?path=${encodeURIComponent(pathValue)}`;
+const encodePathSegments = (pathValue) =>
+  pathValue
+    .split('/')
+    .filter(Boolean)
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
 
-export const buildThumbUrl = (pathValue, size = 'sm') =>
-  `${API_BASE}/api/thumbnail?path=${encodeURIComponent(pathValue)}&size=${size}`;
+export const buildFileUrl = (pathValue) => {
+  const encodedPath = encodePathSegments(pathValue || '');
+  return `${API_BASE}/api/file/${encodedPath}`;
+};
+
+export const buildThumbUrl = (pathValue, size = 'sm') => {
+  const encodedPath = encodePathSegments(pathValue || '');
+  return `${API_BASE}/api/thumbnail/${size}/${encodedPath}`;
+};

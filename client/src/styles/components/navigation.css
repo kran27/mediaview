@@ -72,23 +72,26 @@
 
 .breadcrumbs {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   gap: 0;
   white-space: nowrap;
 }
 
 .crumb-segment {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   gap: 0;
 }
 
 .crumb {
+  display: inline-flex;
+  align-items: baseline;
   padding: 4px 8px;
   border-radius: 999px;
   background: transparent;
   color: var(--text);
   font-weight: 500;
+  line-height: 1.1;
 }
 
 .crumb.current {
@@ -108,13 +111,21 @@
   background: rgba(123, 31, 31, 0.12);
 }
 
+@media (max-width: 900px) {
+  .breadcrumbs-bar.tree-hidden .crumb.current {
+    padding: 4px 10px;
+  }
+}
+
 .breadcrumbs-bar.tree-hidden .crumb.current:hover {
   background: rgba(123, 31, 31, 0.16);
 }
 
 .crumb-separator {
+  display: inline-block;
   margin: 0 6px;
   color: var(--muted);
+  line-height: 1.1;
 }
 
 @media (max-width: 720px) {
@@ -127,8 +138,9 @@
   }
 
   .crumb {
-    padding: 2px 4px;
+    padding: 3px 6px;
     font-size: 12px;
+    line-height: 1.1;
   }
 
   .crumb-separator {

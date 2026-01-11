@@ -7,7 +7,7 @@ import { iconForEntry } from './components/index.js';
 const Lightbox = ({
   open,
   selectedEntry,
-  viewableEntries,
+  lightboxEntries,
   activeIndex,
   onClose,
   onPrev,
@@ -23,6 +23,8 @@ const Lightbox = ({
   });
   const imageRef = useRef(null);
   const videoRef = useRef(null);
+  const lightboxRef = useRef(null);
+  const toolbarRef = useRef(null);
 
   const shouldShowDimensions = selectedEntry?.type === 'image' || selectedEntry?.type === 'video';
   const hasDimensions = Number.isFinite(mediaMeta.width) && Number.isFinite(mediaMeta.height);
@@ -119,15 +121,53 @@ const Lightbox = ({
     return () => window.removeEventListener('keydown', handleKey);
   }, [open, onClose, onPrev, onNext]);
 
+  useEffect(() => {
+    if (!open) return undefined;
+    const lightboxEl = lightboxRef.current;
+    const toolbarEl = toolbarRef.current;
+    if (!lightboxEl || !toolbarEl) return undefined;
+
+    let frameId;
+    const updateToolbarHeight = () => {
+      if (!lightboxEl || !toolbarEl) return;
+      const nextHeight = Math.ceil(toolbarEl.getBoundingClientRect().height);
+      lightboxEl.style.setProperty('--lightbox-toolbar-height', `${nextHeight}px`);
+    };
+
+    updateToolbarHeight();
+
+    let observer;
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => {
+        if (frameId) cancelAnimationFrame(frameId);
+        frameId = requestAnimationFrame(updateToolbarHeight);
+      });
+      observer.observe(toolbarEl);
+    }
+
+    const handleResize = () => updateToolbarHeight();
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      if (observer) observer.disconnect();
+      window.removeEventListener('resize', handleResize);
+      if (frameId) cancelAnimationFrame(frameId);
+    };
+  }, [open, selectedEntry?.path]);
+
   if (!open || !selectedEntry || selectedEntry.isDir) return null;
 
   return (
-    <div className="lightbox" role="dialog" aria-modal="true" onClick={onClose}>
+    <div className="lightbox" ref={lightboxRef} role="dialog" aria-modal="true" onClick={onClose}>
       <div className="lightbox-stage">
         <div
           className={`lightbox-body${selectedEntry.type === 'document' ? ' is-document' : ''}`}
           onClick={(event) => {
             if (isLoadingContent) {
+              onClose();
+              return;
+            }
+            if (event.target === event.currentTarget) {
               onClose();
               return;
             }
@@ -221,7 +261,11 @@ const Lightbox = ({
           )}
         </div>
       </div>
-      <div className="lightbox-toolbar" onClick={(event) => event.stopPropagation()}>
+      <div
+        className="lightbox-toolbar"
+        ref={toolbarRef}
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="lightbox-meta">
           <div className="lightbox-meta-left">
             <span className="lightbox-type-icon" aria-hidden="true">
@@ -249,9 +293,9 @@ const Lightbox = ({
         </div>
         <div className="lightbox-controls">
           <div className="lightbox-nav-group" role="group" aria-label="Navigation">
-            {activeIndex >= 0 && viewableEntries.length > 0 && (
+            {activeIndex >= 0 && lightboxEntries.length > 0 && (
               <span className="lightbox-count">
-                {activeIndex + 1} / {viewableEntries.length}
+                {activeIndex + 1} / {lightboxEntries.length}
               </span>
             )}
             <button
@@ -267,7 +311,7 @@ const Lightbox = ({
               type="button"
               className="lightbox-nav"
               onClick={onNext}
-              disabled={activeIndex >= viewableEntries.length - 1}
+              disabled={activeIndex >= lightboxEntries.length - 1}
               aria-label="Next item"
             >
               ▶

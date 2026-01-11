@@ -44,14 +44,14 @@ export default function App() {
   const selectedEntry = selected && directory?.entries.find((entry) => entry.path === selected.path)
     ? selected
     : null;
-  const viewableEntries = useMemo(() => {
+  const lightboxEntries = useMemo(() => {
     if (!directory) return [];
-    return directory.entries.filter((entry) => isViewableEntry(entry));
+    return directory.entries.filter((entry) => !entry.isDir);
   }, [directory]);
   const activeLightboxIndex = useMemo(() => {
     if (!selectedEntry) return -1;
-    return viewableEntries.findIndex((entry) => entry.path === selectedEntry.path);
-  }, [viewableEntries, selectedEntry]);
+    return lightboxEntries.findIndex((entry) => entry.path === selectedEntry.path);
+  }, [lightboxEntries, selectedEntry]);
 
   const navigateTo = async (pathValue, options = {}) => {
     const { selectPath = '', updateUrl = true, replaceUrl = false } = options;
@@ -104,8 +104,8 @@ export default function App() {
   };
 
   const openLightboxByIndex = (index) => {
-    if (index < 0 || index >= viewableEntries.length) return;
-    const entry = viewableEntries[index];
+    if (index < 0 || index >= lightboxEntries.length) return;
+    const entry = lightboxEntries[index];
     if (!entry) return;
     setSelected(entry);
     setLightboxOpen(true);
@@ -200,7 +200,7 @@ export default function App() {
       <Lightbox
         open={lightboxOpen}
         selectedEntry={selectedEntry}
-        viewableEntries={viewableEntries}
+        lightboxEntries={lightboxEntries}
         activeIndex={activeLightboxIndex}
         onClose={handleCloseLightbox}
         onPrev={handlePrev}

@@ -3,6 +3,13 @@ import { API_BASE } from '../../lib/api.js';
 import { getBasename } from '../../lib/format.js';
 import { buildStats } from '../../lib/stats.js';
 
+const encodePathSegments = (pathValue) =>
+  pathValue
+    .split('/')
+    .filter(Boolean)
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
+
 const getPathChain = (pathValue) => {
   const segments = pathValue.split('/').filter(Boolean);
   const paths = [''];
@@ -49,7 +56,9 @@ export const useDirectoryCache = ({ updateTreeWithEntries }) => {
   }, [updateTreeWithEntries]);
 
   const requestList = useCallback(async (pathValue) => {
-    const response = await fetch(`${API_BASE}/api/list?path=${encodeURIComponent(pathValue)}`);
+    const encodedPath = encodePathSegments(pathValue || '');
+    const url = encodedPath ? `${API_BASE}/api/list/${encodedPath}` : `${API_BASE}/api/list`;
+    const response = await fetch(url);
     if (!response.ok) {
       if (response.status === 404) {
         throw new Error('Requested content could not be found.');

@@ -3,10 +3,13 @@
   inset: 0;
   background: rgba(16, 16, 16, 0.7);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 48px 48px 72px;
+  justify-content: flex-start;
   --lightbox-toolbar-height: 56px;
+  --lightbox-pad-top: 12px;
+  --lightbox-pad-bottom: 12px;
+  padding: var(--lightbox-pad-top) 32px calc(var(--lightbox-pad-bottom) + var(--lightbox-toolbar-height));
   z-index: 20;
   opacity: 0;
   animation: lightboxFade 0.18s ease-out forwards;
@@ -16,11 +19,12 @@
 
 .lightbox-stage {
   width: min(1100px, 86vw);
-  height: calc(100vh - var(--lightbox-toolbar-height) - 140px);
+  height: calc(100vh - var(--lightbox-toolbar-height) - var(--lightbox-pad-top) - var(--lightbox-pad-bottom));
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 16px;
+  margin: auto 0;
   transform: translateY(8px) scale(0.985);
   animation: lightboxRise 0.22s ease-out forwards;
   will-change: transform, opacity;
@@ -35,7 +39,7 @@
   width: auto;
   height: auto;
   max-width: 100%;
-  max-height: calc(100vh - var(--lightbox-toolbar-height) - 160px);
+  max-height: calc(100vh - var(--lightbox-toolbar-height) - var(--lightbox-pad-top) - var(--lightbox-pad-bottom) - 20px);
 }
 
 .lightbox-body.is-document {
@@ -65,7 +69,7 @@
   width: auto;
   height: auto;
   max-width: min(1100px, 86vw);
-  max-height: calc(100vh - var(--lightbox-toolbar-height) - 160px);
+  max-height: calc(100vh - var(--lightbox-toolbar-height) - var(--lightbox-pad-top) - var(--lightbox-pad-bottom) - 20px);
   position: relative;
   border-radius: 0;
   overflow: visible;
@@ -82,7 +86,7 @@
   height: auto;
   object-fit: contain;
   max-width: min(1100px, 86vw);
-  max-height: calc(100vh - var(--lightbox-toolbar-height) - 160px);
+  max-height: calc(100vh - var(--lightbox-toolbar-height) - var(--lightbox-pad-top) - var(--lightbox-pad-bottom) - 20px);
   transition: opacity 0.12s ease;
 }
 
@@ -293,6 +297,34 @@
 }
 
 @media (max-width: 720px) {
+  .lightbox {
+    --lightbox-pad-top: 6px;
+    --lightbox-pad-bottom: 6px;
+    padding: var(--lightbox-pad-top) 0 calc(var(--lightbox-pad-bottom) + var(--lightbox-toolbar-height));
+  }
+
+  .lightbox-stage {
+    width: 100vw;
+    max-width: 100vw;
+    height: calc(100vh - var(--lightbox-toolbar-height) - var(--lightbox-pad-top) - var(--lightbox-pad-bottom));
+  }
+
+  .lightbox-body {
+    width: 100%;
+    max-height: calc(100vh - var(--lightbox-toolbar-height) - var(--lightbox-pad-top) - var(--lightbox-pad-bottom) - 8px);
+  }
+
+  .lightbox-media {
+    max-width: 100vw;
+    max-height: calc(100vh - var(--lightbox-toolbar-height) - var(--lightbox-pad-top) - var(--lightbox-pad-bottom) - 8px);
+  }
+
+  .lightbox-media img,
+  .lightbox-media video {
+    max-width: 100vw;
+    max-height: calc(100vh - var(--lightbox-toolbar-height) - var(--lightbox-pad-top) - var(--lightbox-pad-bottom) - 8px);
+  }
+
   .lightbox-toolbar {
     height: auto;
     padding: 10px 14px 12px;
