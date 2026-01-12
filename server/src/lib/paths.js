@@ -22,8 +22,14 @@ export const decodePathSegments = (rawPath) => {
       .split('/')
       .filter(Boolean)
       .map((segment) => {
-        if (!/%[0-9A-Fa-f]{2}/.test(segment)) return segment;
-        return decodeURIComponent(segment);
+        try {
+          return decodeURIComponent(segment);
+        } catch {
+          // If decoding fails, treat as invalid
+          const decodeError = new Error('Invalid path encoding');
+          decodeError.statusCode = 400;
+          throw decodeError;
+        }
       })
       .join('/');
   } catch {
@@ -51,6 +57,7 @@ export const sanitizeRequestPath = (value = '') => {
     error.statusCode = 400;
     throw error;
   }
+  // Allow all other characters supported by UNIX filesystems
   return normalized;
 };
 
