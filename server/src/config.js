@@ -20,7 +20,7 @@ export const THUMB_SIZES = {
   lg: 960
 };
 export const HASH_CACHE_SCAN_INTERVAL_MS = Number(process.env.HASH_CACHE_SCAN_INTERVAL_MS) || 60000;
-const DEFAULT_EXCLUDE_PATTERNS = ['.DS_Store', '.h5ai'];
+const DEFAULT_EXCLUDE_PATTERNS = ['.DS_Store', '_h5ai'];
 
 export const EXCLUDE_PATTERNS = [
   ...DEFAULT_EXCLUDE_PATTERNS,
