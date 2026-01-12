@@ -3,6 +3,20 @@ import { buildThumbUrl } from '../../lib/api.js';
 import { formatSize } from '../../lib/format.js';
 import { iconForEntry } from './Icons.jsx';
 
+const GRID_THUMB_SIZES = {
+  sm: '(max-width: 720px) 88px, (max-width: 1100px) 96px, 100px',
+  md: '(max-width: 720px) 140px, (max-width: 1100px) 160px, 180px',
+  lg: '(max-width: 720px) 200px, (max-width: 1100px) 230px, 260px'
+};
+const LIST_THUMB_SIZES = '32px';
+const THUMB_WIDTHS = { sm: 200, md: 400, lg: 600 };
+
+const buildThumbSrcSet = (pathValue) => ([
+  `${buildThumbUrl(pathValue, 'sm')} ${THUMB_WIDTHS.sm}w`,
+  `${buildThumbUrl(pathValue, 'md')} ${THUMB_WIDTHS.md}w`,
+  `${buildThumbUrl(pathValue, 'lg')} ${THUMB_WIDTHS.lg}w`
+].join(', '));
+
 const FileList = ({
   entries,
   viewMode,
@@ -11,7 +25,7 @@ const FileList = ({
   zoomLevel
 }) => {
   if (viewMode === 'grid') {
-    const thumbSize = zoomLevel || 'md';
+    const gridSizes = GRID_THUMB_SIZES[zoomLevel] || GRID_THUMB_SIZES.md;
     const folders = entries.filter((entry) => entry.isDir);
     const files = entries.filter((entry) => !entry.isDir);
     return (
@@ -55,7 +69,9 @@ const FileList = ({
                   {entry.type === 'image' && (
                     <div className="thumb-stack">
                       <img
-                        src={buildThumbUrl(entry.path, thumbSize)}
+                        src={buildThumbUrl(entry.path, 'sm')}
+                        srcSet={buildThumbSrcSet(entry.path)}
+                        sizes={gridSizes}
                         alt={entry.name}
                         loading="lazy"
                         onLoad={(event) => {
@@ -71,7 +87,9 @@ const FileList = ({
                   {entry.type === 'video' && (
                     <div className="thumb-stack">
                       <img
-                        src={buildThumbUrl(entry.path, thumbSize)}
+                        src={buildThumbUrl(entry.path, 'sm')}
+                        srcSet={buildThumbSrcSet(entry.path)}
+                        sizes={gridSizes}
                         alt={entry.name}
                         loading="lazy"
                         onLoad={(event) => {
@@ -124,6 +142,8 @@ const FileList = ({
                       <img
                         className="list-thumb"
                         src={buildThumbUrl(entry.path, 'sm')}
+                        srcSet={buildThumbSrcSet(entry.path)}
+                        sizes={LIST_THUMB_SIZES}
                         alt={entry.name}
                         loading="lazy"
                         onLoad={(event) => {
@@ -141,6 +161,8 @@ const FileList = ({
                       <img
                         className="list-thumb"
                         src={buildThumbUrl(entry.path, 'sm')}
+                        srcSet={buildThumbSrcSet(entry.path)}
+                        sizes={LIST_THUMB_SIZES}
                         alt={entry.name}
                         loading="lazy"
                         onLoad={(event) => {

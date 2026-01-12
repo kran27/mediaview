@@ -120,7 +120,9 @@
 }
 
 .grid-folders {
+  grid-template-columns: repeat(auto-fill, minmax(var(--grid-min), 1fr));
   grid-auto-rows: auto;
+  container-type: inline-size;
 }
 
 .grid-folder-thumb {
@@ -153,11 +155,18 @@
   font-size: 14px;
   line-height: 1.3;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
   overflow-wrap: anywhere;
   word-break: break-word;
+  text-overflow: ellipsis;
+}
+
+@container (max-width: 220px) {
+  .grid-folder-card .grid-meta {
+    display: none;
+  }
 }
 
 .grid-card {
@@ -177,11 +186,24 @@
   align-items: center;
   gap: 12px;
   padding: 12px;
-  aspect-ratio: var(--folder-card-ratio);
+  min-height: calc(var(--folder-thumb) + 24px);
+  container-type: inline-size;
 }
 
 .grid-folders .grid-folder-card {
   grid-column: span 2;
+}
+
+@container (max-width: calc((var(--grid-min) * 2) + 14px)) {
+  .grid-folder-card {
+    grid-column: span 1;
+  }
+}
+
+@container (min-width: calc((var(--grid-min) * 2) + 14px)) {
+  .grid-folder-card {
+    aspect-ratio: var(--folder-card-ratio);
+  }
 }
 
 .layout.zoom-sm .grid-card {

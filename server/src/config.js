@@ -16,8 +16,8 @@ export const CLIENT_DIST = process.env.CLIENT_DIST
 export const THUMB_EXT = '.avif';
 export const THUMB_SIZES = {
   sm: 200,
-  md: 480,
-  lg: 960
+  md: 400,
+  lg: 600
 };
 export const HASH_CACHE_SCAN_INTERVAL_MS = Number(process.env.HASH_CACHE_SCAN_INTERVAL_MS) || 60000;
 const DEFAULT_EXCLUDE_PATTERNS = ['.DS_Store', '_h5ai'];

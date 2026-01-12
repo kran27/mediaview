@@ -51,11 +51,7 @@ const Lightbox = ({
       return;
     }
     setLargeFileWarningDismissed(false);
-    if (selectedEntry?.type === 'image' || selectedEntry?.type === 'video') {
-      setMediaLoading(true);
-    } else {
-      setMediaLoading(false);
-    }
+    setMediaLoading(false);
     setMediaMeta({ width: null, height: null, duration: null });
   }, [onClose, open, selectedEntry]);
 
@@ -77,6 +73,25 @@ const Lightbox = ({
         duration: videoRef.current.duration
       });
     }
+  }, [open, selectedEntry]);
+
+  useEffect(() => {
+    if (!open || !selectedEntry) return undefined;
+    if (selectedEntry.type !== 'image' && selectedEntry.type !== 'video') return undefined;
+    const frameId = requestAnimationFrame(() => {
+      if (selectedEntry.type === 'image') {
+        const img = imageRef.current;
+        if (!img) return;
+        setMediaLoading(!(img.complete && img.naturalWidth > 0));
+      } else {
+        const video = videoRef.current;
+        if (!video) return;
+        setMediaLoading(video.readyState < 2);
+      }
+    });
+    return () => {
+      cancelAnimationFrame(frameId);
+    };
   }, [open, selectedEntry]);
 
   useEffect(() => {
@@ -223,6 +238,7 @@ const Lightbox = ({
                   ref={imageRef}
                   src={previewSource}
                   alt={selectedEntry.name}
+                  loading="eager"
                   onLoad={(event) => {
                     setMediaLoading(false);
                     setMediaMeta({

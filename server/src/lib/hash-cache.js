@@ -31,6 +31,8 @@ const cacheStatus = {
   lastScanUpdates: 0,
   lastScanRemovals: 0
 };
+const pendingThumbUpdates = new Map();
+const pendingThumbRemovals = new Map();
 
 const getParentPath = (relativePath) => {
   if (!relativePath) return null;
@@ -160,6 +162,33 @@ export const onHashUpdate = (listener) => {
 export const onHashScanComplete = (listener) => {
   scanListeners.add(listener);
   return () => scanListeners.delete(listener);
+};
+
+const queueThumbUpdate = (entry, previousHash) => {
+  if (!entry?.path) return;
+  const existing = pendingThumbUpdates.get(entry.path);
+  const nextPreviousHash = previousHash || existing?.previousHash;
+  pendingThumbUpdates.set(entry.path, {
+    ...entry,
+    previousHash: nextPreviousHash
+  });
+  pendingThumbRemovals.delete(entry.path);
+};
+
+const queueThumbRemoval = (relativePath, removalHash) => {
+  if (!relativePath) return;
+  const existing = pendingThumbUpdates.get(relativePath);
+  const hash = removalHash || existing?.hash || existing?.previousHash || null;
+  pendingThumbUpdates.delete(relativePath);
+  pendingThumbRemovals.set(relativePath, { path: relativePath, hash });
+};
+
+const flushThumbQueue = () => {
+  const updates = [...pendingThumbUpdates.values()];
+  const removals = [...pendingThumbRemovals.values()];
+  pendingThumbUpdates.clear();
+  pendingThumbRemovals.clear();
+  return { updates, removals };
 };
 
 export const setHashEntry = (relativePath, entry, options = {}) => {
@@ -301,7 +330,9 @@ export const startHashCacheWorker = async () => {
       if (message.type === 'hash-update' && Array.isArray(message.entries)) {
         message.entries.forEach((entry) => {
           if (!entry?.path) return;
+          const previousHash = HASH_CACHE.get(entry.path)?.hash || null;
           setHashEntry(entry.path, entry);
+          queueThumbUpdate(entry, previousHash);
         });
       }
       if (message.type === 'dir-update' && Array.isArray(message.entries)) {
@@ -311,7 +342,11 @@ export const startHashCacheWorker = async () => {
         });
       }
       if (message.type === 'hash-remove' && Array.isArray(message.paths)) {
-        message.paths.forEach((pathValue) => removeHashEntry(pathValue));
+        message.paths.forEach((pathValue) => {
+          const previousHash = HASH_CACHE.get(pathValue)?.hash || null;
+          removeHashEntry(pathValue);
+          queueThumbRemoval(pathValue, previousHash);
+        });
       }
       if (message.type === 'dir-remove' && Array.isArray(message.paths)) {
         message.paths.forEach((pathValue) => removeDirectoryEntry(pathValue));
@@ -329,7 +364,12 @@ export const startHashCacheWorker = async () => {
         cacheStatus.lastScanDurationMs = message.finishedAt - message.startedAt;
         cacheStatus.lastScanUpdates = message.updatedCount || 0;
         cacheStatus.lastScanRemovals = message.removedCount || 0;
-        scanListeners.forEach((listener) => listener(cacheStatus));
+        const { updates, removals } = flushThumbQueue();
+        scanListeners.forEach((listener) => listener({
+          status: cacheStatus,
+          updates,
+          removals
+        }));
       }
     });
     unsubscribeWorkerUpdates?.();

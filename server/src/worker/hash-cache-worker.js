@@ -17,14 +17,6 @@ const toPosix = (value) => value.split(path.sep).join('/');
 const isExcludedPath = (relativePath) => {
   if (!relativePath) return false;
   const posixPath = toPosix(relativePath);
-  if (
-    posixPath === '.thumbnail' ||
-    posixPath.startsWith('.thumbnail/') ||
-    posixPath === '.cache' ||
-    posixPath.startsWith('.cache/')
-  ) {
-    return true;
-  }
   if (!excludePatterns || excludePatterns.length === 0) return false;
   const candidates = new Set([posixPath, posixPath.replace(/\/+$/, ''), `${posixPath}/`]);
   return excludePatterns.some((pattern) =>
@@ -104,7 +96,8 @@ const scanTree = async () => {
     let dirEntries;
     try {
       dirEntries = await fsPromises.readdir(absolutePath, { withFileTypes: true });
-    } catch {
+    } catch (error) {
+      console.error('Hash cache scan failed to read directory', error);
       continue;
     }
     for (const dirent of dirEntries) {
@@ -121,7 +114,8 @@ const scanTree = async () => {
       let stats;
       try {
         stats = await fsPromises.stat(filePath);
-      } catch {
+      } catch (error) {
+        console.error('Hash cache scan failed to stat file', error);
         continue;
       }
       const cached = cache.get(relativePath);
@@ -135,8 +129,8 @@ const scanTree = async () => {
         if (updates.length >= BATCH_SIZE) {
           flushUpdates();
         }
-      } catch {
-        // ignore hash failures
+      } catch (error) {
+        console.error('Hash cache scan failed to hash file', error);
       }
     }
   }
@@ -165,7 +159,11 @@ const scanTree = async () => {
   }
   return {
     updatedCount: fileUpdateCount + dirUpdateCount,
-    removedCount: fileRemovals.length + dirRemovals.length
+    removedCount: fileRemovals.length + dirRemovals.length,
+    fileUpdatedCount: fileUpdateCount,
+    fileRemovedCount: fileRemovals.length,
+    dirUpdatedCount: dirUpdateCount,
+    dirRemovedCount: dirRemovals.length
   };
 };
 
@@ -185,8 +183,8 @@ const runScan = async () => {
   let result = { updatedCount: 0, removedCount: 0 };
   try {
     result = await scanTree();
-  } catch {
-    // ignore scan failures
+  } catch (error) {
+    console.error('Hash cache scan failed', error);
   }
   const finishedAt = Date.now();
   parentPort?.postMessage({
@@ -196,6 +194,13 @@ const runScan = async () => {
     updatedCount: result.updatedCount,
     removedCount: result.removedCount
   });
+  const changedFiles = (result.fileUpdatedCount || 0) + (result.fileRemovedCount || 0);
+  const changedDirs = (result.dirUpdatedCount || 0) + (result.dirRemovedCount || 0);
+  if (changedFiles > 0) {
+    console.log(
+      `Scan complete: ${changedFiles} files changed (updated ${result.fileUpdatedCount || 0}, removed ${result.fileRemovedCount || 0}), ${changedDirs} dirs changed (updated ${result.dirUpdatedCount || 0}, removed ${result.dirRemovedCount || 0})`
+    );
+  }
   scanning = false;
   scheduleScan();
 };

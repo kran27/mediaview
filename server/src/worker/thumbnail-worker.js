@@ -68,7 +68,7 @@ const loadHashCache = async () => {
     });
   } catch (error) {
     if (error.code !== 'ENOENT') {
-      // ignore cache read errors
+      console.error('Thumbnail worker failed to read cache', error);
     }
   }
 };
@@ -83,6 +83,36 @@ const getCachedHash = async (relativePath, absolutePath, stats) => {
   hashCache.set(relativePath, entry);
   parentPort?.postMessage({ type: 'hashed', path: relativePath, ...entry });
   return hash;
+};
+
+const dropPending = (relativePath) => {
+  if (!relativePath) return;
+  pending.delete(relativePath);
+  for (let index = queue.length - 1; index >= 0; index -= 1) {
+    if (queue[index] === relativePath) {
+      queue.splice(index, 1);
+    }
+  }
+};
+
+const deleteThumbFiles = async (hash, originalName) => {
+  if (!hash || !originalName) return;
+  let deletedCount = 0;
+  await Promise.all(
+    sizeEntries.map(([variant]) => {
+      const thumbName = `${hash}-${variant}-${originalName}${thumbExt}`;
+      const thumbPath = path.join(thumbDir, thumbName);
+      return fsPromises.unlink(thumbPath)
+        .then(() => {
+          deletedCount += 1;
+        })
+        .catch((error) => {
+          if (error?.code === 'ENOENT') return;
+          console.error('Thumbnail worker failed to delete thumbnail', error);
+        });
+    })
+  );
+  return deletedCount;
 };
 
 const enqueuePaths = (paths) => {
@@ -105,18 +135,26 @@ const generateThumbnails = async (relativePath) => {
 
   const hash = await getCachedHash(relativePath, absolutePath, stats);
   const originalName = path.basename(relativePath);
-
-  for (const [variant, width] of sizeEntries) {
+  const missing = sizeEntries.filter(([variant]) => {
     const thumbName = `${hash}-${variant}-${originalName}${thumbExt}`;
-    const thumbPath = path.join(thumbDir, thumbName);
-    if (fs.existsSync(thumbPath)) continue;
-    await sharp(absolutePath)
-      .resize({ width, height: width, fit: 'inside', withoutEnlargement: true })
-      .avif({ quality: 50, effort: 6, chromaSubsampling: '4:2:0' })
-      .toFile(thumbPath);
+    return !fs.existsSync(path.join(thumbDir, thumbName));
+  });
+  if (missing.length === 0) {
+    return { hash, created: 0 };
   }
 
-  return hash;
+  let created = 0;
+  for (const [variant, width] of missing) {
+    const thumbName = `${hash}-${variant}-${originalName}${thumbExt}`;
+    const thumbPath = path.join(thumbDir, thumbName);
+    await sharp(absolutePath)
+      .resize({ width, height: width, fit: 'inside', withoutEnlargement: true })
+      .avif({ quality: 40, effort: 6, chromaSubsampling: '4:2:0' })
+      .toFile(thumbPath);
+    created += 1;
+  }
+
+  return { hash, created };
 };
 
 const ensureFfmpeg = () => {
@@ -165,19 +203,27 @@ const generateVideoThumbnails = async (relativePath) => {
 
   const hash = await getCachedHash(relativePath, absolutePath, stats);
   const originalName = path.basename(relativePath);
+  const missing = sizeEntries.filter(([variant]) => {
+    const thumbName = `${hash}-${variant}-${originalName}${thumbExt}`;
+    return !fs.existsSync(path.join(thumbDir, thumbName));
+  });
+  if (missing.length === 0) {
+    return { hash, created: 0 };
+  }
   const frameBuffer = await extractVideoFrame(absolutePath);
 
-  for (const [variant, width] of sizeEntries) {
+  let created = 0;
+  for (const [variant, width] of missing) {
     const thumbName = `${hash}-${variant}-${originalName}${thumbExt}`;
     const thumbPath = path.join(thumbDir, thumbName);
-    if (fs.existsSync(thumbPath)) continue;
     await sharp(frameBuffer)
       .resize({ width, height: width, fit: 'inside', withoutEnlargement: true })
-      .avif({ quality: 32, effort: 4, chromaSubsampling: '4:2:0' })
+      .avif({ quality: 40, effort: 6, chromaSubsampling: '4:2:0' })
       .toFile(thumbPath);
+    created += 1;
   }
 
-  return hash;
+  return { hash, created };
 };
 
 const processQueue = async () => {
@@ -192,8 +238,8 @@ const processQueue = async () => {
       } else {
         await generateThumbnails(next);
       }
-    } catch {
-      // Skip failures and continue processing.
+    } catch (error) {
+      console.error('Thumbnail worker failed to generate thumbnail', error);
     } finally {
       pending.delete(next);
     }
@@ -209,7 +255,8 @@ const scanTree = async () => {
     let dirEntries;
     try {
       dirEntries = await fsPromises.readdir(absolutePath, { withFileTypes: true });
-    } catch {
+    } catch (error) {
+      console.error('Thumbnail worker failed to read directory', error);
       continue;
     }
     for (const dirent of dirEntries) {
@@ -240,6 +287,52 @@ parentPort?.on('message', (message) => {
       mtimeMs: message.entry.mtimeMs,
       size: message.entry.size ?? null
     });
+  }
+  if (message.type === 'sync' && Array.isArray(message.entries) && Array.isArray(message.removals)) {
+    const updates = message.entries;
+    const removals = message.removals;
+    void (async () => {
+      let createdCount = 0;
+      let deletedCount = 0;
+      for (const entry of updates) {
+        if (!entry?.path || !entry?.hash) continue;
+        dropPending(entry.path);
+        const previousHash = entry.previousHash || hashCache.get(entry.path)?.hash;
+        if (previousHash && previousHash !== entry.hash) {
+          deletedCount += await deleteThumbFiles(previousHash, path.basename(entry.path));
+        }
+        hashCache.set(entry.path, {
+          hash: entry.hash,
+          mtimeMs: entry.mtimeMs,
+          size: entry.size ?? null
+        });
+        const ext = path.extname(entry.path).toLowerCase();
+        if (IMAGE_EXTS.has(ext) || VIDEO_EXTS.has(ext)) {
+          if (VIDEO_EXTS.has(ext)) {
+            const result = await generateVideoThumbnails(entry.path);
+            createdCount += result?.created || 0;
+          } else {
+            const result = await generateThumbnails(entry.path);
+            createdCount += result?.created || 0;
+          }
+        }
+      }
+      for (const pathValue of removals) {
+        const removalPath = pathValue?.path || pathValue;
+        if (!removalPath) continue;
+        dropPending(removalPath);
+        const removalHash = pathValue?.hash || hashCache.get(removalPath)?.hash;
+        if (removalHash) {
+          deletedCount += await deleteThumbFiles(removalHash, path.basename(removalPath));
+        }
+        hashCache.delete(removalPath);
+      }
+      if (createdCount > 0 || deletedCount > 0) {
+        console.log(
+          `Thumbnail worker: ${createdCount} created, ${deletedCount} removed`
+        );
+      }
+    })();
   }
   if (message.type === 'scan') {
     void scanTree();
