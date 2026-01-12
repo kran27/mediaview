@@ -13,6 +13,26 @@ export const normalizeRequestPath = (value = '') => {
   return trimmed.replace(/\\/g, '/').replace(/^\/+/, '');
 };
 
+export const decodePathSegments = (rawPath) => {
+  if (Array.isArray(rawPath)) {
+    return rawPath.join('/');
+  }
+  try {
+    return rawPath
+      .split('/')
+      .filter(Boolean)
+      .map((segment) => {
+        if (!/%[0-9A-Fa-f]{2}/.test(segment)) return segment;
+        return decodeURIComponent(segment);
+      })
+      .join('/');
+  } catch {
+    const decodeError = new Error('Invalid path encoding');
+    decodeError.statusCode = 400;
+    throw decodeError;
+  }
+};
+
 export const sanitizeRequestPath = (value = '') => {
   const normalized = normalizeRequestPath(value);
   if (normalized.length > MAX_REQUEST_PATH) {

@@ -1,9 +1,9 @@
-import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import { ROOT_NAME } from '../config.js';
-import { readDirectory, buildStats } from '../lib/directory.js';
+import { getDirectoryEntries, hasDirectoryEntry } from '../lib/hash-cache.js';
 import { isExcludedPath } from '../lib/exclude.js';
-import { resolveSafePath, sanitizeRequestPath } from '../lib/paths.js';
+import { decodePathSegments, sanitizeRequestPath } from '../lib/paths.js';
+import { buildStats } from '../lib/stats.js';
 import { enqueueThumbnailJobs } from '../lib/thumbnails.js';
 
 const collectThumbPaths = (entries) =>
@@ -12,25 +12,6 @@ const collectThumbPaths = (entries) =>
     .map((entry) => entry.path);
 
 export const registerListRoute = (app) => {
-  const decodePathSegments = (rawPath) => {
-    if (Array.isArray(rawPath)) {
-      return rawPath.join('/');
-    }
-    try {
-      return rawPath
-        .split('/')
-        .filter(Boolean)
-        .map((segment) => {
-          if (!/%[0-9A-Fa-f]{2}/.test(segment)) return segment;
-          return decodeURIComponent(segment);
-        })
-        .join('/');
-    } catch {
-      const decodeError = new Error('Invalid path encoding');
-      decodeError.statusCode = 400;
-      throw decodeError;
-    }
-  };
   const getRequestPath = (req) => {
     if (typeof req.params.path === 'string' || Array.isArray(req.params.path)) {
       return decodePathSegments(req.params.path);
@@ -44,70 +25,53 @@ export const registerListRoute = (app) => {
     return '';
   };
 
-  const handleRequest = async (req, res) => {
+  const handleRequest = (req, res) => {
     let requestPath;
-    let absolutePath;
     try {
       requestPath = sanitizeRequestPath(getRequestPath(req));
       if (isExcludedPath(requestPath)) {
         res.status(404).json({ error: 'Not found' });
         return;
       }
-      absolutePath = resolveSafePath(requestPath);
     } catch (error) {
       res.status(error.statusCode || 400).json({ error: error.message });
       return;
     }
 
-    try {
-      const dirStats = await fsPromises.stat(absolutePath);
-      if (!dirStats.isDirectory()) {
-        res.status(400).json({ error: 'Not a directory' });
-        return;
-      }
-
-      const entries = await readDirectory(requestPath);
-      const stats = buildStats(entries);
-
-      const children = {};
-      await Promise.all(
-        entries
-          .filter((entry) => entry.isDir)
-          .map(async (entry) => {
-            try {
-              children[entry.path] = await readDirectory(entry.path);
-            } catch {
-              children[entry.path] = [];
-            }
-          })
-      );
-
-      const thumbPaths = collectThumbPaths(entries);
-      Object.values(children).forEach((childEntries) => {
-        thumbPaths.push(...collectThumbPaths(childEntries));
-      });
-      enqueueThumbnailJobs(thumbPaths);
-
-      res.json({
-        root: {
-          name: ROOT_NAME,
-          path: ''
-        },
-        current: {
-          name: requestPath ? path.basename(absolutePath) : ROOT_NAME,
-          path: requestPath
-        },
-        stats,
-        entries,
-        children
-      });
-    } catch (error) {
-      if (error.code === 'ENOENT') {
-        res.status(404).json({ error: 'Not found' });
-        return;
-      }
-      res.status(500).json({ error: 'Failed to read directory', detail: error.message });
+    if (!hasDirectoryEntry(requestPath)) {
+      res.status(404).json({ error: 'Not found' });
+      return;
     }
+
+    const entries = getDirectoryEntries(requestPath) || [];
+    const stats = buildStats(entries);
+
+    const children = {};
+    entries
+      .filter((entry) => entry.isDir)
+      .forEach((entry) => {
+        children[entry.path] = getDirectoryEntries(entry.path) || [];
+      });
+
+    const thumbPaths = collectThumbPaths(entries);
+    Object.values(children).forEach((childEntries) => {
+      thumbPaths.push(...collectThumbPaths(childEntries));
+    });
+    enqueueThumbnailJobs(thumbPaths);
+
+    res.json({
+      root: {
+        name: ROOT_NAME,
+        path: ''
+      },
+      current: {
+        name: requestPath ? path.posix.basename(requestPath) : ROOT_NAME,
+        path: requestPath
+      },
+      stats,
+      entries,
+      children
+    });
   };
 
   app.get('/api/list', handleRequest);

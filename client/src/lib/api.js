@@ -9,7 +9,7 @@ const encodePathSegments = (pathValue) =>
 
 export const buildFileUrl = (pathValue) => {
   const encodedPath = encodePathSegments(pathValue || '');
-  return `${API_BASE}/api/file/${encodedPath}`;
+  return `${API_BASE}/${encodedPath}`;
 };
 
 export const buildThumbUrl = (pathValue, size = 'sm') => {

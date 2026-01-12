@@ -14,6 +14,8 @@ COPY server/ ./
 COPY --from=client-build /app/client/dist /app/client/dist
 ENV NODE_ENV=production
 ENV CLIENT_DIST=/app/client/dist
+ENV ARCHIVE_ROOT=/archive
+ENV CACHE_ROOT=/cache
 EXPOSE 3001
 ENTRYPOINT ["tini", "--"]
 CMD ["node", "index.js"]

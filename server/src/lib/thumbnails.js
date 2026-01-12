@@ -11,12 +11,14 @@ import {
 import {
   HASH_CACHE_FILE,
   getCachedHash,
+  onHashScanComplete,
   onHashUpdate,
   setHashEntry
 } from './hash-cache.js';
 
 let thumbnailWorker = null;
 let unsubscribeHashUpdates = null;
+let unsubscribeScanComplete = null;
 
 const ensureThumbDir = async () => {
   try {
@@ -66,6 +68,11 @@ export const startThumbnailWorker = async () => {
       if (!thumbnailWorker || !entry?.path) return;
       thumbnailWorker.postMessage({ type: 'hash-update', entry });
     });
+    unsubscribeScanComplete?.();
+    unsubscribeScanComplete = onHashScanComplete(() => {
+      if (!thumbnailWorker) return;
+      thumbnailWorker.postMessage({ type: 'scan' });
+    });
     thumbnailWorker.on('error', (error) => {
       console.error('Thumbnail worker error', error);
     });
@@ -74,7 +81,6 @@ export const startThumbnailWorker = async () => {
         console.error(`Thumbnail worker exited with code ${code}`);
       }
     });
-    thumbnailWorker.postMessage({ type: 'scan' });
   } catch (error) {
     console.error('Failed to start thumbnail worker', error);
   }

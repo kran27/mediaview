@@ -5,9 +5,9 @@ import crypto from 'node:crypto';
 import { parentPort, workerData } from 'node:worker_threads';
 import { minimatch } from 'minimatch';
 
-const { rootDir, cacheFile, excludePatterns } = workerData;
+const { rootDir, cacheFile, excludePatterns, scanIntervalMs } = workerData;
 const BATCH_SIZE = 200;
-const SCAN_INTERVAL_MS = 60 * 1000;
+const SCAN_INTERVAL_MS = Number(scanIntervalMs) > 0 ? Number(scanIntervalMs) : 60 * 1000;
 let scanTimer = null;
 let scanning = false;
 const cache = new Map();
@@ -51,6 +51,7 @@ const loadCache = async () => {
     Object.entries(entries).forEach(([relativePath, entry]) => {
       if (!entry?.hash || !Number.isFinite(entry.mtimeMs)) return;
       cache.set(relativePath, {
+        kind: 'file',
         hash: entry.hash,
         mtimeMs: entry.mtimeMs,
         size: entry.size ?? null
@@ -64,15 +65,39 @@ const loadCache = async () => {
 };
 
 const scanTree = async () => {
-  const seen = new Set();
+  const seenFiles = new Set();
+  const seenDirs = new Set();
   const updates = [];
+  const dirUpdates = [];
+  let fileUpdateCount = 0;
+  let dirUpdateCount = 0;
 
   const flushUpdates = () => {
     if (updates.length === 0) return;
+    fileUpdateCount += updates.length;
     parentPort?.postMessage({ type: 'hash-update', entries: updates.splice(0, updates.length) });
   };
 
+  const flushDirUpdates = () => {
+    if (dirUpdates.length === 0) return;
+    dirUpdateCount += dirUpdates.length;
+    parentPort?.postMessage({ type: 'dir-update', entries: dirUpdates.splice(0, dirUpdates.length) });
+  };
+
+  const ensureDir = (relativePath) => {
+    seenDirs.add(relativePath);
+    const cached = cache.get(relativePath);
+    if (!cached || cached.kind !== 'dir') {
+      cache.set(relativePath, { kind: 'dir' });
+      dirUpdates.push({ path: relativePath });
+      if (dirUpdates.length >= BATCH_SIZE) {
+        flushDirUpdates();
+      }
+    }
+  };
+
   const stack = [''];
+  ensureDir('');
   while (stack.length > 0) {
     const current = stack.pop();
     const absolutePath = path.join(rootDir, current);
@@ -86,11 +111,12 @@ const scanTree = async () => {
       const relativePath = toPosix(path.join(current, dirent.name));
       if (isExcludedPath(relativePath)) continue;
       if (dirent.isDirectory()) {
+        ensureDir(relativePath);
         stack.push(relativePath);
         continue;
       }
       if (!dirent.isFile()) continue;
-      seen.add(relativePath);
+      seenFiles.add(relativePath);
       const filePath = path.join(rootDir, relativePath);
       let stats;
       try {
@@ -99,12 +125,12 @@ const scanTree = async () => {
         continue;
       }
       const cached = cache.get(relativePath);
-      if (cached && cached.mtimeMs === stats.mtimeMs) {
+      if (cached && cached.kind === 'file' && cached.mtimeMs === stats.mtimeMs) {
         continue;
       }
       try {
         const hash = await hashFile(filePath);
-        cache.set(relativePath, { hash, mtimeMs: stats.mtimeMs, size: stats.size });
+        cache.set(relativePath, { kind: 'file', hash, mtimeMs: stats.mtimeMs, size: stats.size });
         updates.push({ path: relativePath, hash, mtimeMs: stats.mtimeMs, size: stats.size });
         if (updates.length >= BATCH_SIZE) {
           flushUpdates();
@@ -116,18 +142,31 @@ const scanTree = async () => {
   }
 
   flushUpdates();
+  flushDirUpdates();
 
-  const removals = [];
-  for (const cachedPath of cache.keys()) {
-    if (!seen.has(cachedPath)) {
-      removals.push(cachedPath);
+  const fileRemovals = [];
+  const dirRemovals = [];
+  for (const [cachedPath, cachedEntry] of cache.entries()) {
+    if (cachedEntry?.kind === 'dir') {
+      if (!seenDirs.has(cachedPath)) {
+        dirRemovals.push(cachedPath);
+      }
+    } else if (!seenFiles.has(cachedPath)) {
+      fileRemovals.push(cachedPath);
     }
   }
-  if (removals.length > 0) {
-    parentPort?.postMessage({ type: 'hash-remove', paths: removals });
-    removals.forEach((relativePath) => cache.delete(relativePath));
+  if (fileRemovals.length > 0) {
+    parentPort?.postMessage({ type: 'hash-remove', paths: fileRemovals });
+    fileRemovals.forEach((relativePath) => cache.delete(relativePath));
   }
-  return { updatedCount: updates.length, removedCount: removals.length };
+  if (dirRemovals.length > 0) {
+    parentPort?.postMessage({ type: 'dir-remove', paths: dirRemovals });
+    dirRemovals.forEach((relativePath) => cache.delete(relativePath));
+  }
+  return {
+    updatedCount: fileUpdateCount + dirUpdateCount,
+    removedCount: fileRemovals.length + dirRemovals.length
+  };
 };
 
 const scheduleScan = () => {
@@ -168,6 +207,7 @@ parentPort?.on('message', (message) => {
   if (!message) return;
   if (message.type === 'hash-update' && message.entry?.path) {
     cache.set(message.entry.path, {
+      kind: 'file',
       hash: message.entry.hash,
       mtimeMs: message.entry.mtimeMs,
       size: message.entry.size ?? null

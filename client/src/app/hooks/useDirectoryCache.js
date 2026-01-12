@@ -23,6 +23,7 @@ const getPathChain = (pathValue) => {
 
 export const useDirectoryCache = ({ updateTreeWithEntries }) => {
   const cacheRef = useRef(new Map());
+  const inflightRef = useRef(new Map());
 
   const getCachedListing = useCallback((pathValue) => cacheRef.current.get(pathValue), []);
 
@@ -56,16 +57,28 @@ export const useDirectoryCache = ({ updateTreeWithEntries }) => {
   }, [updateTreeWithEntries]);
 
   const requestList = useCallback(async (pathValue) => {
-    const encodedPath = encodePathSegments(pathValue || '');
+    const key = pathValue || '';
+    const existingRequest = inflightRef.current.get(key);
+    if (existingRequest) return existingRequest;
+    const encodedPath = encodePathSegments(key);
     const url = encodedPath ? `${API_BASE}/api/list/${encodedPath}` : `${API_BASE}/api/list`;
-    const response = await fetch(url);
-    if (!response.ok) {
-      if (response.status === 404) {
-        throw new Error('Requested content could not be found.');
-      }
-      throw new Error(`Failed to load ${pathValue || 'root'}`);
-    }
-    return response.json();
+    const request = fetch(url)
+      .then((response) => {
+        if (!response.ok) {
+          if (response.status === 404) {
+            throw new Error('Requested content could not be found.');
+          }
+          throw new Error(`Failed to load ${key || 'root'}`);
+        }
+        return response.json();
+      })
+      .finally(() => {
+        if (inflightRef.current.get(key) === request) {
+          inflightRef.current.delete(key);
+        }
+      });
+    inflightRef.current.set(key, request);
+    return request;
   }, []);
 
   const fetchList = useCallback(async (pathValue, options = {}) => {

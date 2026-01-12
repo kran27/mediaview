@@ -7,15 +7,16 @@ export const readUrlState = () => {
         .map((segment) => decodeURIComponent(segment))
         .join('/')
     : '';
+  const preview = params.get('preview') || params.get('item') || '';
   return {
     path: decodedPath,
-    item: params.get('item') || ''
+    preview
   };
 };
 
 export const buildUrlState = (state) => {
   const params = new URLSearchParams();
-  if (state.item) params.set('item', state.item);
+  if (state.preview) params.set('preview', state.preview);
   const query = params.toString();
   const pathname = state.path
     ? `/${state.path

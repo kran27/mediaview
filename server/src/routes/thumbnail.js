@@ -5,28 +5,10 @@ import mime from 'mime-types';
 import { THUMB_SIZES } from '../config.js';
 import { isThumbablePath } from '../lib/classify.js';
 import { isExcludedPath } from '../lib/exclude.js';
-import { resolveSafePath, sanitizeRequestPath } from '../lib/paths.js';
+import { matchesEtag } from '../lib/http.js';
+import { decodePathSegments, resolveSafePath, sanitizeRequestPath } from '../lib/paths.js';
+import { hasHashEntry } from '../lib/hash-cache.js';
 import { enqueueThumbnailJobs, getCachedHash, getThumbPath } from '../lib/thumbnails.js';
-
-const decodePathSegments = (rawPath) => {
-  if (Array.isArray(rawPath)) {
-    return rawPath.join('/');
-  }
-  try {
-    return rawPath
-      .split('/')
-      .filter(Boolean)
-      .map((segment) => {
-        if (!/%[0-9A-Fa-f]{2}/.test(segment)) return segment;
-        return decodeURIComponent(segment);
-      })
-      .join('/');
-  } catch {
-    const decodeError = new Error('Invalid path encoding');
-    decodeError.statusCode = 400;
-    throw decodeError;
-  }
-};
 
 const parseThumbnailRequest = (req) => {
   if (typeof req.params.size === 'string' && (typeof req.params.path === 'string' || Array.isArray(req.params.path))) {
@@ -54,16 +36,6 @@ const parseThumbnailRequest = (req) => {
   return { requestPath: '', size: String(req.query.size || 'sm') };
 };
 
-const matchesEtag = (headerValue, etag) => {
-  if (!headerValue) return false;
-  const candidates = headerValue
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean)
-    .map((value) => (value.startsWith('W/') ? value.slice(2) : value));
-  return candidates.includes('*') || candidates.includes(etag);
-};
-
 export const registerThumbnailRoute = (app) => {
   const handleRequest = async (req, res) => {
     let parsed;
@@ -84,6 +56,10 @@ export const registerThumbnailRoute = (app) => {
     let absolutePath;
     try {
       if (isExcludedPath(requestPath)) {
+        res.status(404).json({ error: 'Not found' });
+        return;
+      }
+      if (!hasHashEntry(requestPath)) {
         res.status(404).json({ error: 'Not found' });
         return;
       }

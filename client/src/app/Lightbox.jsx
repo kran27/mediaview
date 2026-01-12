@@ -4,6 +4,9 @@ import { formatSize } from '../lib/format.js';
 import { isViewableEntry } from '../lib/fileTypes.js';
 import { iconForEntry } from './components/index.js';
 
+const LARGE_FILE_THRESHOLD_BYTES = 10 * 1024 * 1024;
+const TEXT_PREVIEW_BYTES = 64 * 1024;
+
 const Lightbox = ({
   open,
   selectedEntry,
@@ -21,28 +24,40 @@ const Lightbox = ({
     truncated: false,
     error: ''
   });
+  const [largeFileWarningDismissed, setLargeFileWarningDismissed] = useState(false);
   const imageRef = useRef(null);
   const videoRef = useRef(null);
   const lightboxRef = useRef(null);
   const toolbarRef = useRef(null);
 
+  const isStreamable = selectedEntry?.type === 'video'
+    || selectedEntry?.type === 'audio';
   const shouldShowDimensions = selectedEntry?.type === 'image' || selectedEntry?.type === 'video';
   const hasDimensions = Number.isFinite(mediaMeta.width) && Number.isFinite(mediaMeta.height);
   const placeholderDimensions = '-- × --';
+  const isLargeFile = Number.isFinite(selectedEntry?.size)
+    && selectedEntry.size >= LARGE_FILE_THRESHOLD_BYTES;
+  const shouldWarnLargeFile = isLargeFile && !isStreamable;
+  const shouldGateLargeFile = shouldWarnLargeFile && !largeFileWarningDismissed;
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setLargeFileWarningDismissed(false);
+      return;
+    }
     if (selectedEntry?.isDir) {
+      setLargeFileWarningDismissed(false);
       onClose();
       return;
     }
+    setLargeFileWarningDismissed(false);
     if (selectedEntry?.type === 'image' || selectedEntry?.type === 'video') {
       setMediaLoading(true);
     } else {
       setMediaLoading(false);
     }
     setMediaMeta({ width: null, height: null, duration: null });
-  }, [open, selectedEntry, onClose]);
+  }, [onClose, open, selectedEntry]);
 
   useEffect(() => {
     if (!open || !selectedEntry) return;
@@ -69,12 +84,16 @@ const Lightbox = ({
       setTextPreview({ status: 'idle', content: '', truncated: false, error: '' });
       return undefined;
     }
+    if (shouldGateLargeFile) {
+      setTextPreview({ status: 'idle', content: '', truncated: false, error: '' });
+      return undefined;
+    }
     let isActive = true;
     const loadText = async () => {
       setTextPreview({ status: 'loading', content: '', truncated: false, error: '' });
       try {
         const response = await fetch(buildFileUrl(selectedEntry.path), {
-          headers: { Range: 'bytes=0-65535' }
+          headers: { Range: `bytes=0-${TEXT_PREVIEW_BYTES - 1}` }
         });
         if (!response.ok) {
           throw new Error('Failed to load text preview');
@@ -101,7 +120,7 @@ const Lightbox = ({
     return () => {
       isActive = false;
     };
-  }, [open, selectedEntry]);
+  }, [open, selectedEntry, shouldGateLargeFile]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -156,25 +175,53 @@ const Lightbox = ({
 
   if (!open || !selectedEntry || selectedEntry.isDir) return null;
 
+  const previewSource = buildFileUrl(selectedEntry.path);
+
   return (
     <div className="lightbox" ref={lightboxRef} role="dialog" aria-modal="true">
       <button type="button" className="lightbox-backdrop" onClick={onClose} aria-label="Close preview" />
       <div className="lightbox-stage">
-        <div className={`lightbox-body${selectedEntry.type === 'document' ? ' is-document' : ''}`}>
+        <div
+          className={`lightbox-body${selectedEntry.type === 'document' ? ' is-document' : ''}${mediaLoading ? ' is-loading' : ''}`}
+        >
           <button
             type="button"
             className="lightbox-body-dismiss"
             onClick={onClose}
             aria-label="Close preview"
           />
-          {(selectedEntry.type === 'image' || selectedEntry.type === 'video') && (
+          {shouldGateLargeFile && (
+            <div className="lightbox-warning">
+              <div className="lightbox-warning-title">Large file</div>
+              <div className="lightbox-warning-copy">
+                This file is {formatSize(selectedEntry.size)}. Loading may take a while.
+              </div>
+              <div className="lightbox-warning-actions">
+                <button
+                  type="button"
+                  className="lightbox-warning-button"
+                  onClick={() => setLargeFileWarningDismissed(true)}
+                >
+                  Load file
+                </button>
+                <button
+                  type="button"
+                  className="lightbox-warning-button is-secondary"
+                  onClick={onClose}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          )}
+          {!shouldGateLargeFile && (selectedEntry.type === 'image' || selectedEntry.type === 'video') && (
             <div className={`lightbox-media${mediaLoading ? ' is-loading' : ''}`}>
               {mediaLoading && <div className="media-loader" aria-hidden="true" />}
               {selectedEntry.type === 'image' && (
                 <img
-                  key={selectedEntry.path}
+                  key={previewSource}
                   ref={imageRef}
-                  src={buildFileUrl(selectedEntry.path)}
+                  src={previewSource}
                   alt={selectedEntry.name}
                   onLoad={(event) => {
                     setMediaLoading(false);
@@ -184,16 +231,18 @@ const Lightbox = ({
                       duration: null
                     });
                   }}
-                  onError={() => setMediaLoading(false)}
+                  onError={() => {
+                    setMediaLoading(false);
+                  }}
                 />
               )}
               {selectedEntry.type === 'video' && (
                 <video
                   controls
                   autoPlay
-                  key={selectedEntry.path}
+                  key={previewSource}
                   ref={videoRef}
-                  src={buildFileUrl(selectedEntry.path)}
+                  src={previewSource}
                   preload="metadata"
                   onLoadedMetadata={(event) => {
                     setMediaMeta({
@@ -208,11 +257,11 @@ const Lightbox = ({
               )}
             </div>
           )}
-          {selectedEntry.type === 'audio' && (
+          {!shouldGateLargeFile && selectedEntry.type === 'audio' && (
             <audio
               controls
               autoPlay
-              src={buildFileUrl(selectedEntry.path)}
+              src={previewSource}
               preload="metadata"
               onLoadedMetadata={(event) => {
                 setMediaMeta({
@@ -223,14 +272,14 @@ const Lightbox = ({
               }}
             />
           )}
-          {selectedEntry.type === 'document' && (
+          {!shouldGateLargeFile && selectedEntry.type === 'document' && (
             <iframe
               className="lightbox-iframe"
-              src={buildFileUrl(selectedEntry.path)}
+              src={previewSource}
               title={selectedEntry.name}
             />
           )}
-          {selectedEntry.type === 'text' && (
+          {!shouldGateLargeFile && selectedEntry.type === 'text' && (
             <div className="lightbox-text">
               {textPreview.status === 'loading' && <div>Loading preview...</div>}
               {textPreview.status === 'error' && (
@@ -244,7 +293,7 @@ const Lightbox = ({
               )}
             </div>
           )}
-          {!isViewableEntry(selectedEntry) && (
+          {!shouldGateLargeFile && !isViewableEntry(selectedEntry) && (
             <div className="lightbox-unknown">
               <div className="lightbox-unknown-title">Preview unavailable</div>
               <div className="lightbox-unknown-copy">

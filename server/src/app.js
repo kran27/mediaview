@@ -3,13 +3,16 @@ import helmet from 'helmet';
 import fs from 'node:fs';
 import path from 'node:path';
 import compression from 'compression';
-import { registerFileRoute } from './routes/file.js';
+import { handleFileRequest } from './routes/file.js';
 import { registerHashCacheRoute } from './routes/hash-cache.js';
 import { registerHealthRoute } from './routes/health.js';
 import { registerListRoute } from './routes/list.js';
 import { registerTreeRoute } from './routes/tree.js';
 import { registerThumbnailRoute } from './routes/thumbnail.js';
+import { isExcludedPath } from './lib/exclude.js';
+import { hasHashEntry } from './lib/hash-cache.js';
 import { CLIENT_DIST } from './config.js';
+import { decodePathSegments, sanitizeRequestPath } from './lib/paths.js';
 
 export const createApp = () => {
   const app = express();
@@ -50,7 +53,31 @@ export const createApp = () => {
   registerListRoute(app);
   registerTreeRoute(app);
   registerThumbnailRoute(app);
-  registerFileRoute(app);
+
+  const shouldHandleFile = (requestPath) => {
+    if (!requestPath) return false;
+    if (isExcludedPath(requestPath)) return false;
+    return hasHashEntry(requestPath);
+  };
+
+  app.get('/*path', async (req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      next();
+      return;
+    }
+    let requestPath;
+    try {
+      requestPath = sanitizeRequestPath(decodePathSegments(req.path));
+    } catch {
+      next();
+      return;
+    }
+    if (!shouldHandleFile(requestPath)) {
+      next();
+      return;
+    }
+    await handleFileRequest(req, res, requestPath);
+  });
 
   if (process.env.NODE_ENV === 'production' && fs.existsSync(CLIENT_DIST)) {
     const assetCacheControl = (res, filePath) => {

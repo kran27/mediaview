@@ -68,7 +68,7 @@ export default function App() {
       setUrlState(
         {
           path: pathValue,
-          item: shouldLightbox && selection ? selection.name : ''
+          preview: shouldLightbox && selection ? selection.name : ''
         },
         { replace: replaceUrl }
       );
@@ -84,7 +84,7 @@ export default function App() {
       setSelected(entry);
       setLightboxOpen(true);
       setUrlState(
-        { path: currentPath, item: entry.name },
+        { path: currentPath, preview: entry.name },
         { replace: true }
       );
     }
@@ -97,7 +97,7 @@ export default function App() {
     }
     setLightboxOpen(true);
     setUrlState(
-      { path: currentPath, item: entry.name },
+      { path: currentPath, preview: entry.name },
       { replace: true }
     );
   };
@@ -105,7 +105,7 @@ export default function App() {
   const handleCloseLightbox = () => {
     setLightboxOpen(false);
     setUrlState(
-      { path: currentPath, item: '' },
+      { path: currentPath, preview: '' },
       { replace: true }
     );
   };
@@ -117,7 +117,7 @@ export default function App() {
     setSelected(entry);
     setLightboxOpen(true);
     setUrlState(
-      { path: currentPath, item: entry.name },
+      { path: currentPath, preview: entry.name },
       { replace: true }
     );
   };
@@ -134,7 +134,7 @@ export default function App() {
     const applyUrlState = () => {
       const urlState = readUrlState();
       const derivedPath = urlState.path;
-      void navigateTo(derivedPath, { selectPath: urlState.item, updateUrl: false });
+      void navigateTo(derivedPath, { selectPath: urlState.preview, updateUrl: false });
     };
     applyUrlState();
     const handlePop = () => applyUrlState();
@@ -184,16 +184,16 @@ export default function App() {
           hideHeader={Boolean(status.error)}
         />
 
-      <DirectoryPanel
-        directory={directory}
-        rootLabel={rootLabel}
-        currentPathName={currentPathName}
-        status={status}
-        lastGoodPath={lastGoodPath}
-        onNavigate={navigateTo}
-        sortKey={sortKey}
-        sortDir={sortDir}
-        onSortClick={handleSortClick}
+        <DirectoryPanel
+          directory={directory}
+          rootLabel={rootLabel}
+          currentPathName={currentPathName}
+          status={status}
+          lastGoodPath={lastGoodPath}
+          onNavigate={navigateTo}
+          sortKey={sortKey}
+          sortDir={sortDir}
+          onSortClick={handleSortClick}
           entries={filteredEntries}
           viewMode={viewMode}
           zoomLevel={zoomLevel}
