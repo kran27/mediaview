@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ViewToggle } from './components/index.js';
 
 const AppHeader = ({
-  rootLabel,
+  onNavigateRoot,
   viewMode,
   onViewModeChange,
   zoomLevel,
@@ -37,13 +37,27 @@ const AppHeader = ({
 
   return (
     <header className="topbar">
-      <div className="brand">
-        <span className="brand-mark">⧉</span>
+      <button
+        type="button"
+        className="brand"
+        onClick={onNavigateRoot}
+        aria-label="Go to archive root"
+      >
+        <span className="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 1000 1000" role="img" aria-hidden="true">
+            <path
+              fill="rgba(0,0,0,.9)"
+              d="M135 255s3 64 199 259l-65 141 173-50 92 241 100-254h232s-93-122-306-173c-213-50-329-81-425-164"
+            />
+          </svg>
+        </span>
         <div>
-          <h1>{rootLabel}</h1>
-          <p>MediaView archive browser</p>
+          <div className="brand-title">
+            <p>The Mirror's Edge <b>Archive</b></p>
+            <span className="brand-subtitle">STAGING</span>
+          </div>
         </div>
-      </div>
+      </button>
       <div className={`topbar-controls ${isSearchOpen ? 'search-active' : 'search-collapsed'}`}>
         <div className="search">
           <button type="button" className="search-toggle" onClick={handleSearchOpen}>

@@ -6,6 +6,7 @@
   gap: 16px;
   flex-wrap: nowrap;
   padding: 6px 12px;
+  min-height: var(--breadcrumbs-height);
   background: var(--panel);
   border-bottom: 1px solid var(--border);
   position: relative;
@@ -14,7 +15,7 @@
 
 @media (max-width: 900px) {
   .breadcrumbs-bar {
-    padding: 10px 12px;
+    padding: 6px;
   }
 }
 
@@ -24,7 +25,7 @@
   overflow-y: hidden;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  padding: 0 4px;
+  padding: 0;
   flex: 1;
   min-width: 0;
   position: relative;
@@ -72,30 +73,45 @@
 
 .breadcrumbs {
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   gap: 0;
   white-space: nowrap;
 }
 
 .crumb-segment {
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   gap: 0;
 }
 
 .crumb {
   display: inline-flex;
-  align-items: baseline;
-  padding: 4px 8px;
+  align-items: center;
+  padding: 0px 8px;
   border-radius: 999px;
   background: transparent;
   color: var(--text);
-  font-weight: 500;
+  font-weight: 400;
   line-height: 1.1;
+  min-height: 28px;
+  font-size: 15px;
+}
+
+.crumb .icon {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.7;
+}
+
+.crumb.is-home {
+  height: 28px;
+  gap: 0px 8px;
+  justify-content: center;
 }
 
 .crumb.current {
-  font-weight: 700;
   color: var(--accent);
 }
 
@@ -103,44 +119,38 @@
   background: var(--panel-2);
 }
 
-.breadcrumbs-bar.tree-hidden .crumb {
-  font-size: 15px;
-}
-
 .breadcrumbs-bar.tree-hidden .crumb.current {
   background: rgba(123, 31, 31, 0.12);
 }
 
-@media (max-width: 900px) {
-  .breadcrumbs-bar.tree-hidden .crumb.current {
-    padding: 4px 10px;
-  }
-}
 
-.breadcrumbs-bar.tree-hidden .crumb.current:hover {
+.breadcrumbs-bar.tree-hidden .crumb.current:not(.is-home):hover {
   background: rgba(123, 31, 31, 0.16);
 }
 
 .crumb-separator {
   display: inline-block;
-  margin: 0 6px;
+  margin: 0 2px;
   color: var(--muted);
   line-height: 1.1;
+  align-self: center;
 }
 
 @media (max-width: 720px) {
-  .breadcrumbs {
-    gap: 0;
-  }
-
-  .crumb-segment {
-    gap: 0;
-  }
-
   .crumb {
-    padding: 3px 6px;
-    font-size: 12px;
-    line-height: 1.1;
+    font-size: 14px;
+  }
+
+  .breadcrumbs-bar.tree-hidden .crumb.current:not(.is-home) {
+    padding: 0px 8px;
+  }
+
+  .crumb-label {
+    min-width: 0;
+  }
+
+  .crumb.current .crumb-label {
+    min-width: max-content;
   }
 
   .crumb-separator {

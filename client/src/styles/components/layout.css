@@ -12,7 +12,7 @@
   align-items: stretch;
   background: var(--panel);
   flex: 1;
-  min-height: 0;
+  min-height: calc(100vh - var(--topbar-height) - var(--breadcrumbs-height));
   --thumb-ratio: 3 / 2;
   --folder-thumb: 64px;
   --folder-card-ratio: 4 / 1;
@@ -29,7 +29,7 @@
 
 .layout.zoom-md {
   --grid-min: 180px;
-  --folder-card-ratio: 5.5 / 1;
+  --folder-card-ratio: 6 / 1;
 }
 
 .layout.zoom-lg {

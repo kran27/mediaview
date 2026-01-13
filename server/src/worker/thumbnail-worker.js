@@ -1,7 +1,6 @@
 import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { parentPort, workerData } from 'node:worker_threads';
 import sharp from 'sharp';
@@ -9,7 +8,7 @@ import { minimatch } from 'minimatch';
 
 const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.avif']);
 const VIDEO_EXTS = new Set(['.mp4', '.m4v', '.webm', '.mov', '.mkv', '.avi', '.mpg', '.mpeg']);
-const { rootDir, thumbDir, excludePatterns, sizes, thumbExt, cacheFile } = workerData;
+const { rootDir, thumbDir, excludePatterns, sizes, thumbExt } = workerData;
 const sizeEntries = Object.entries(sizes);
 const pending = new Set();
 const queue = [];
@@ -39,50 +38,8 @@ const isExcludedPath = (relativePath) => {
   );
 };
 
-const hashFile = (absolutePath) =>
-  new Promise((resolve, reject) => {
-    const hash = crypto.createHash('sha256');
-    const stream = fs.createReadStream(absolutePath);
-    stream.on('error', reject);
-    stream.on('data', (chunk) => hash.update(chunk));
-    stream.on('end', () => resolve(hash.digest('hex')));
-  });
-
 const ensureThumbDir = async () => {
   await fsPromises.mkdir(thumbDir, { recursive: true });
-};
-
-const loadHashCache = async () => {
-  if (!cacheFile) return;
-  try {
-    const contents = await fsPromises.readFile(cacheFile, 'utf8');
-    const data = JSON.parse(contents);
-    const entries = data?.entries || {};
-    Object.entries(entries).forEach(([relativePath, entry]) => {
-      if (!entry?.hash || !Number.isFinite(entry.mtimeMs)) return;
-      hashCache.set(relativePath, {
-        hash: entry.hash,
-        mtimeMs: entry.mtimeMs,
-        size: entry.size ?? null
-      });
-    });
-  } catch (error) {
-    if (error.code !== 'ENOENT') {
-      console.error('Thumbnail worker failed to read cache', error);
-    }
-  }
-};
-
-const getCachedHash = async (relativePath, absolutePath, stats) => {
-  const cached = hashCache.get(relativePath);
-  if (cached && cached.mtimeMs === stats.mtimeMs) {
-    return cached.hash;
-  }
-  const hash = await hashFile(absolutePath);
-  const entry = { hash, mtimeMs: stats.mtimeMs, size: stats.size };
-  hashCache.set(relativePath, entry);
-  parentPort?.postMessage({ type: 'hashed', path: relativePath, ...entry });
-  return hash;
 };
 
 const dropPending = (relativePath) => {
@@ -115,9 +72,17 @@ const deleteThumbFiles = async (hash, originalName) => {
   return deletedCount;
 };
 
-const enqueuePaths = (paths) => {
-  paths.forEach((relativePath) => {
-    if (!relativePath || pending.has(relativePath) || isExcludedPath(relativePath)) return;
+const enqueueEntries = (entries) => {
+  entries.forEach((entry) => {
+    const relativePath = entry?.path;
+    if (!relativePath || !entry?.hash || pending.has(relativePath) || isExcludedPath(relativePath)) {
+      return;
+    }
+    hashCache.set(relativePath, {
+      hash: entry.hash,
+      mtimeMs: entry.mtimeMs,
+      size: entry.size ?? null
+    });
     pending.add(relativePath);
     queue.push(relativePath);
   });
@@ -126,26 +91,39 @@ const enqueuePaths = (paths) => {
   }
 };
 
-const generateThumbnails = async (relativePath) => {
+const enqueuePaths = (paths) => {
+  const entries = [];
+  paths.forEach((relativePath) => {
+    const cached = hashCache.get(relativePath);
+    if (!cached?.hash) return;
+    entries.push({ path: relativePath, ...cached });
+  });
+  enqueueEntries(entries);
+};
+
+const generateThumbnails = async (relativePath, hash, options = {}) => {
   const absolutePath = path.join(rootDir, relativePath);
   const stats = await fsPromises.stat(absolutePath);
   if (!stats.isFile()) return;
   const ext = path.extname(relativePath).toLowerCase();
   if (!IMAGE_EXTS.has(ext)) return;
 
-  const hash = await getCachedHash(relativePath, absolutePath, stats);
+  const cachedHash = hash || hashCache.get(relativePath)?.hash;
+  if (!cachedHash) return;
   const originalName = path.basename(relativePath);
-  const missing = sizeEntries.filter(([variant]) => {
-    const thumbName = `${hash}-${variant}-${originalName}${thumbExt}`;
-    return !fs.existsSync(path.join(thumbDir, thumbName));
-  });
-  if (missing.length === 0) {
-    return { hash, created: 0 };
+  const variants = options.force
+    ? sizeEntries
+    : sizeEntries.filter(([variant]) => {
+      const thumbName = `${cachedHash}-${variant}-${originalName}${thumbExt}`;
+      return !fs.existsSync(path.join(thumbDir, thumbName));
+    });
+  if (variants.length === 0) {
+    return { hash: cachedHash, created: 0 };
   }
 
   let created = 0;
-  for (const [variant, width] of missing) {
-    const thumbName = `${hash}-${variant}-${originalName}${thumbExt}`;
+  for (const [variant, width] of variants) {
+    const thumbName = `${cachedHash}-${variant}-${originalName}${thumbExt}`;
     const thumbPath = path.join(thumbDir, thumbName);
     await sharp(absolutePath)
       .resize({ width, height: width, fit: 'inside', withoutEnlargement: true })
@@ -154,7 +132,7 @@ const generateThumbnails = async (relativePath) => {
     created += 1;
   }
 
-  return { hash, created };
+  return { hash: cachedHash, created };
 };
 
 const ensureFfmpeg = () => {
@@ -193,7 +171,7 @@ const extractVideoFrame = (absolutePath) =>
     });
   });
 
-const generateVideoThumbnails = async (relativePath) => {
+const generateVideoThumbnails = async (relativePath, hash, options = {}) => {
   if (!ensureFfmpeg()) return;
   const absolutePath = path.join(rootDir, relativePath);
   const stats = await fsPromises.stat(absolutePath);
@@ -201,20 +179,23 @@ const generateVideoThumbnails = async (relativePath) => {
   const ext = path.extname(relativePath).toLowerCase();
   if (!VIDEO_EXTS.has(ext)) return;
 
-  const hash = await getCachedHash(relativePath, absolutePath, stats);
+  const cachedHash = hash || hashCache.get(relativePath)?.hash;
+  if (!cachedHash) return;
   const originalName = path.basename(relativePath);
-  const missing = sizeEntries.filter(([variant]) => {
-    const thumbName = `${hash}-${variant}-${originalName}${thumbExt}`;
-    return !fs.existsSync(path.join(thumbDir, thumbName));
-  });
-  if (missing.length === 0) {
-    return { hash, created: 0 };
+  const variants = options.force
+    ? sizeEntries
+    : sizeEntries.filter(([variant]) => {
+      const thumbName = `${cachedHash}-${variant}-${originalName}${thumbExt}`;
+      return !fs.existsSync(path.join(thumbDir, thumbName));
+    });
+  if (variants.length === 0) {
+    return { hash: cachedHash, created: 0 };
   }
   const frameBuffer = await extractVideoFrame(absolutePath);
 
   let created = 0;
-  for (const [variant, width] of missing) {
-    const thumbName = `${hash}-${variant}-${originalName}${thumbExt}`;
+  for (const [variant, width] of variants) {
+    const thumbName = `${cachedHash}-${variant}-${originalName}${thumbExt}`;
     const thumbPath = path.join(thumbDir, thumbName);
     await sharp(frameBuffer)
       .resize({ width, height: width, fit: 'inside', withoutEnlargement: true })
@@ -223,7 +204,7 @@ const generateVideoThumbnails = async (relativePath) => {
     created += 1;
   }
 
-  return { hash, created };
+  return { hash: cachedHash, created };
 };
 
 const processQueue = async () => {
@@ -233,10 +214,11 @@ const processQueue = async () => {
     if (!next) continue;
     try {
       const ext = path.extname(next).toLowerCase();
+      const cachedHash = hashCache.get(next)?.hash;
       if (VIDEO_EXTS.has(ext)) {
-        await generateVideoThumbnails(next);
+        await generateVideoThumbnails(next, cachedHash);
       } else {
-        await generateThumbnails(next);
+        await generateThumbnails(next, cachedHash);
       }
     } catch (error) {
       console.error('Thumbnail worker failed to generate thumbnail', error);
@@ -274,12 +256,15 @@ const scanTree = async () => {
 };
 
 await ensureThumbDir();
-await loadHashCache();
 
 parentPort?.on('message', (message) => {
   if (!message) return;
-  if (message.type === 'enqueue' && Array.isArray(message.paths)) {
-    enqueuePaths(message.paths);
+  if (message.type === 'enqueue') {
+    if (Array.isArray(message.entries)) {
+      enqueueEntries(message.entries);
+    } else if (Array.isArray(message.paths)) {
+      enqueuePaths(message.paths);
+    }
   }
   if (message.type === 'hash-update' && message.entry?.path) {
     hashCache.set(message.entry.path, {
@@ -308,11 +293,12 @@ parentPort?.on('message', (message) => {
         });
         const ext = path.extname(entry.path).toLowerCase();
         if (IMAGE_EXTS.has(ext) || VIDEO_EXTS.has(ext)) {
+          const force = !previousHash || previousHash !== entry.hash;
           if (VIDEO_EXTS.has(ext)) {
-            const result = await generateVideoThumbnails(entry.path);
+            const result = await generateVideoThumbnails(entry.path, entry.hash, { force });
             createdCount += result?.created || 0;
           } else {
-            const result = await generateThumbnails(entry.path);
+            const result = await generateThumbnails(entry.path, entry.hash, { force });
             createdCount += result?.created || 0;
           }
         }

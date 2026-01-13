@@ -3,7 +3,7 @@ import fsPromises from 'node:fs/promises';
 import mime from 'mime-types';
 import { isExcludedPath } from '../lib/exclude.js';
 import { matchesEtag } from '../lib/http.js';
-import { getCachedHash, hasHashEntry } from '../lib/hash-cache.js';
+import { getHashEntry, hasHashEntry } from '../lib/hash-cache.js';
 import { resolveSafePath, sanitizeRequestPath } from '../lib/paths.js';
 
 export const handleFileRequest = async (req, res, rawPath) => {
@@ -35,7 +35,12 @@ export const handleFileRequest = async (req, res, rawPath) => {
     }
 
     const mimeType = mime.lookup(absolutePath) || 'application/octet-stream';
-    const hash = await getCachedHash(requestPath, absolutePath, stats);
+    const cached = getHashEntry(requestPath);
+    if (!cached?.hash) {
+      res.status(404).json({ error: 'File not found' });
+      return;
+    }
+    const hash = cached.hash;
     const etag = `"${hash}"`;
     const cacheControl = 'public, max-age=3600, must-revalidate';
     res.setHeader('ETag', etag);

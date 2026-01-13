@@ -1,7 +1,5 @@
-import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { Worker } from 'node:worker_threads';
 import {
   CACHE_ROOT,
@@ -14,6 +12,7 @@ import { classifyFile } from './classify.js';
 
 export const HASH_CACHE_DIR = CACHE_ROOT;
 export const HASH_CACHE_FILE = path.join(HASH_CACHE_DIR, 'file-hashes.json');
+const MAX_WORKER_CACHE_ENTRIES = 20000;
 
 const HASH_CACHE = new Map();
 const ENTRY_INDEX = new Map();
@@ -24,6 +23,9 @@ let cacheWorker = null;
 let flushTimer = null;
 let flushing = false;
 let unsubscribeWorkerUpdates = null;
+let dirtyGeneration = 0;
+let flushedGeneration = 0;
+let cacheLoaded = false;
 const cacheStatus = {
   lastScanStart: null,
   lastScanEnd: null,
@@ -109,15 +111,6 @@ const ensureCacheDir = async () => {
   await fsPromises.mkdir(HASH_CACHE_DIR, { recursive: true });
 };
 
-const hashFile = (absolutePath) =>
-  new Promise((resolve, reject) => {
-    const hash = crypto.createHash('sha256');
-    const stream = fs.createReadStream(absolutePath);
-    stream.on('error', reject);
-    stream.on('data', (chunk) => hash.update(chunk));
-    stream.on('end', () => resolve(hash.digest('hex')));
-  });
-
 const serializeCache = () => {
   const entries = {};
   for (const [relativePath, entry] of HASH_CACHE.entries()) {
@@ -126,23 +119,36 @@ const serializeCache = () => {
   return { version: 1, entries };
 };
 
+const markDirty = () => {
+  dirtyGeneration += 1;
+};
+
+const isDirty = () => dirtyGeneration !== flushedGeneration;
+
 const writeCacheFile = async () => {
   if (flushing) return;
+  if (!isDirty()) return;
   flushing = true;
+  const targetGeneration = dirtyGeneration;
   try {
     await ensureCacheDir();
     const payload = JSON.stringify(serializeCache());
     const tmpPath = `${HASH_CACHE_FILE}.tmp`;
     await fsPromises.writeFile(tmpPath, payload, 'utf8');
     await fsPromises.rename(tmpPath, HASH_CACHE_FILE);
+    flushedGeneration = targetGeneration;
   } catch (error) {
     console.error('Failed to write hash cache', error);
   } finally {
     flushing = false;
+    if (isDirty()) {
+      scheduleFlush();
+    }
   }
 };
 
 const scheduleFlush = () => {
+  if (!isDirty()) return;
   if (flushTimer) return;
   flushTimer = setTimeout(() => {
     flushTimer = null;
@@ -199,6 +205,7 @@ export const setHashEntry = (relativePath, entry, options = {}) => {
     size: entry.size ?? null
   });
   upsertFileEntry(relativePath, entry);
+  markDirty();
   if (options.emit !== false) {
     emitHashUpdate({
       path: relativePath,
@@ -212,18 +219,22 @@ export const setHashEntry = (relativePath, entry, options = {}) => {
   }
 };
 
-export const removeHashEntry = (relativePath) => {
+export const removeHashEntry = (relativePath, options = {}) => {
   if (!HASH_CACHE.delete(relativePath)) return;
+  markDirty();
   const existing = ENTRY_INDEX.get(relativePath);
   if (existing && !existing.isDir) {
     removeEntryIndex(relativePath);
   }
-  scheduleFlush();
+  if (options.persist !== false) {
+    scheduleFlush();
+  }
 };
 
 export const loadHashCache = async () => {
   ensureDirEntry('');
   await ensureCacheDir();
+  let loaded = false;
   try {
     const contents = await fsPromises.readFile(HASH_CACHE_FILE, 'utf8');
     const data = JSON.parse(contents);
@@ -237,22 +248,19 @@ export const loadHashCache = async () => {
       });
       upsertFileEntry(relativePath, entry);
     });
+    loaded = true;
   } catch (error) {
-    if (error.code !== 'ENOENT') {
+    if (error.code === 'ENOENT') {
+      loaded = true;
+    } else {
       console.error('Failed to read hash cache', error);
     }
+  } finally {
+    cacheLoaded = loaded;
   }
 };
 
-export const getCachedHash = async (relativePath, absolutePath, stats) => {
-  const cached = HASH_CACHE.get(relativePath);
-  if (cached && cached.mtimeMs === stats.mtimeMs) {
-    return cached.hash;
-  }
-  const hash = await hashFile(absolutePath);
-  setHashEntry(relativePath, { hash, mtimeMs: stats.mtimeMs, size: stats.size });
-  return hash;
-};
+export const getHashEntry = (relativePath) => HASH_CACHE.get(relativePath) || null;
 
 export const hasHashEntry = (relativePath) => HASH_CACHE.has(relativePath);
 
@@ -317,12 +325,17 @@ export const startHashCacheWorker = async () => {
   if (cacheWorker) return;
   await ensureCacheDir();
   try {
+    const shouldShareInitialEntries =
+      cacheLoaded && HASH_CACHE.size <= MAX_WORKER_CACHE_ENTRIES;
+    const serialized = shouldShareInitialEntries ? serializeCache() : null;
     cacheWorker = new Worker(new URL('../worker/hash-cache-worker.js', import.meta.url), {
       workerData: {
         rootDir: ROOT_DIR,
         cacheFile: HASH_CACHE_FILE,
         excludePatterns: EXCLUDE_PATTERNS,
-        scanIntervalMs: HASH_CACHE_SCAN_INTERVAL_MS
+        scanIntervalMs: HASH_CACHE_SCAN_INTERVAL_MS,
+        initialEntries: serialized ? serialized.entries : null,
+        initialEntriesLoaded: shouldShareInitialEntries
       }
     });
     cacheWorker.on('message', (message) => {
@@ -331,7 +344,7 @@ export const startHashCacheWorker = async () => {
         message.entries.forEach((entry) => {
           if (!entry?.path) return;
           const previousHash = HASH_CACHE.get(entry.path)?.hash || null;
-          setHashEntry(entry.path, entry);
+          setHashEntry(entry.path, entry, { persist: false });
           queueThumbUpdate(entry, previousHash);
         });
       }
@@ -344,7 +357,7 @@ export const startHashCacheWorker = async () => {
       if (message.type === 'hash-remove' && Array.isArray(message.paths)) {
         message.paths.forEach((pathValue) => {
           const previousHash = HASH_CACHE.get(pathValue)?.hash || null;
-          removeHashEntry(pathValue);
+          removeHashEntry(pathValue, { persist: false });
           queueThumbRemoval(pathValue, previousHash);
         });
       }
@@ -370,6 +383,9 @@ export const startHashCacheWorker = async () => {
           updates,
           removals
         }));
+        if (isDirty()) {
+          scheduleFlush();
+        }
       }
     });
     unsubscribeWorkerUpdates?.();

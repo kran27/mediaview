@@ -3,12 +3,14 @@ import '../styles/components/layout.css';
 import '../styles/components/lightbox.css';
 import '../styles/components/navigation.css';
 import '../styles/components/header.css';
+import '../styles/components/footer.css';
 import '../styles/components/animations.css';
 import { Breadcrumbs, TreePanel } from './components/index.js';
 import { isViewableEntry } from '../lib/fileTypes.js';
 import { getBasename } from '../lib/format.js';
 import { readUrlState, setUrlState } from '../lib/urlState.js';
 import { useDirectoryData } from './hooks/useDirectoryData.js';
+import AppFooter from './components/AppFooter.jsx';
 import AppHeader from './AppHeader.jsx';
 import DirectoryPanel from './DirectoryPanel.jsx';
 import Lightbox from './Lightbox.jsx';
@@ -42,7 +44,7 @@ export default function App() {
   });
   const loadDirectoryRef = useRef(loadDirectory);
 
-  const rootLabel = directory?.root?.name || 'Archive';
+  const rootLabel = "The Mirror's Edge Archive";
   const currentPathName = currentPath ? getBasename(currentPath) : rootLabel;
   const selectedEntry = selected && directory?.entries.find((entry) => entry.path === selected.path)
     ? selected
@@ -158,6 +160,9 @@ export default function App() {
     <div className="page">
       <AppHeader
         rootLabel={rootLabel}
+        onNavigateRoot={() => {
+          void navigateTo('');
+        }}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         zoomLevel={zoomLevel}
@@ -201,6 +206,8 @@ export default function App() {
           selectedPath={selectedEntry?.path}
         />
       </main>
+
+      <AppFooter />
 
       <Lightbox
         open={lightboxOpen}

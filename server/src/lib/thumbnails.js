@@ -9,12 +9,7 @@ import {
   THUMB_EXT,
   THUMB_SIZES
 } from '../config.js';
-import {
-  HASH_CACHE_FILE,
-  getCachedHash,
-  onHashScanComplete,
-  setHashEntry
-} from './hash-cache.js';
+import { getHashEntry, onHashScanComplete } from './hash-cache.js';
 
 const WORKER_POOL_LIMIT = 4;
 const thumbnailWorkers = [];
@@ -31,23 +26,34 @@ const ensureThumbDir = async () => {
 export const getThumbName = (hash, variant, originalName) =>
   `${hash}-${variant}-${originalName}${THUMB_EXT}`;
 
-export { getCachedHash };
-
 export const getThumbPath = (hash, variant, originalName) =>
   path.join(THUMB_DIR, getThumbName(hash, variant, originalName));
 
 export const enqueueThumbnailJobs = (paths) => {
   if (thumbnailWorkers.length === 0 || paths.length === 0) return;
-  const buckets = new Map();
-  paths.forEach((relativePath) => {
-    const index = getWorkerIndex(relativePath);
-    if (!buckets.has(index)) buckets.set(index, []);
-    buckets.get(index).push(relativePath);
+  const uniquePaths = new Set(paths);
+  const entries = [];
+  uniquePaths.forEach((relativePath) => {
+    const cached = getHashEntry(relativePath);
+    if (!cached?.hash) return;
+    entries.push({
+      path: relativePath,
+      hash: cached.hash,
+      mtimeMs: cached.mtimeMs,
+      size: cached.size ?? null
+    });
   });
-  buckets.forEach((bucketPaths, index) => {
+  if (entries.length === 0) return;
+  const buckets = new Map();
+  entries.forEach((entry) => {
+    const index = getWorkerIndex(entry.path);
+    if (!buckets.has(index)) buckets.set(index, []);
+    buckets.get(index).push(entry);
+  });
+  buckets.forEach((bucketEntries, index) => {
     const worker = thumbnailWorkers[index];
     if (!worker) return;
-    worker.postMessage({ type: 'enqueue', paths: bucketPaths });
+    worker.postMessage({ type: 'enqueue', entries: bucketEntries });
   });
 };
 
@@ -105,17 +111,7 @@ export const startThumbnailWorker = async () => {
           thumbDir: THUMB_DIR,
           excludePatterns: EXCLUDE_PATTERNS,
           sizes: THUMB_SIZES,
-          thumbExt: THUMB_EXT,
-          cacheFile: HASH_CACHE_FILE
-        }
-      });
-      worker.on('message', (message) => {
-        if (message?.type === 'hashed') {
-          setHashEntry(message.path, {
-            hash: message.hash,
-            mtimeMs: message.mtimeMs,
-            size: message.size
-          }, { emit: false });
+          thumbExt: THUMB_EXT
         }
       });
       worker.on('error', (error) => {

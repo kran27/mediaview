@@ -7,8 +7,8 @@ import { isThumbablePath } from '../lib/classify.js';
 import { isExcludedPath } from '../lib/exclude.js';
 import { matchesEtag } from '../lib/http.js';
 import { decodePathSegments, resolveSafePath, sanitizeRequestPath } from '../lib/paths.js';
-import { hasHashEntry } from '../lib/hash-cache.js';
-import { enqueueThumbnailJobs, getCachedHash, getThumbPath } from '../lib/thumbnails.js';
+import { getHashEntry, hasHashEntry } from '../lib/hash-cache.js';
+import { enqueueThumbnailJobs, getThumbPath } from '../lib/thumbnails.js';
 
 const parseThumbnailRequest = (req) => {
   if (typeof req.params.size === 'string' && (typeof req.params.path === 'string' || Array.isArray(req.params.path))) {
@@ -79,7 +79,12 @@ export const registerThumbnailRoute = (app) => {
         res.status(415).json({ error: 'Unsupported media type' });
         return;
       }
-      const hash = await getCachedHash(requestPath, absolutePath, stats);
+      const cached = getHashEntry(requestPath);
+      if (!cached?.hash) {
+        res.status(404).json({ error: 'Not found' });
+        return;
+      }
+      const hash = cached.hash;
       const thumbPath = getThumbPath(hash, size, path.basename(requestPath));
       if (!fs.existsSync(thumbPath)) {
         enqueueThumbnailJobs([requestPath]);
