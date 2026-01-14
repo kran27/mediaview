@@ -1,72 +1,23 @@
 import './Icons.css';
+import { isArchiveEntry } from '../../lib/fileTypes.js';
 
-export const IconFolder = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true" className="icon">
-    <path d="M3 6.5a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-  </svg>
-);
-
-export const IconFile = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true" className="icon">
-    <path d="M7 3h7l5 5v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
-    <path d="M14 3v5h5" />
-  </svg>
-);
-
-export const IconImage = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true" className="icon">
-    <rect x="3" y="4" width="18" height="16" rx="2" />
-    <circle cx="9" cy="10" r="2" />
-    <path d="M21 17l-5-5-4 4-2-2-5 5" />
-  </svg>
-);
-
-export const IconVideo = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true" className="icon">
-    <rect x="3" y="5" width="14" height="14" rx="2" />
-    <path d="M17 9l4-2v10l-4-2z" />
-  </svg>
-);
-
-export const IconAudio = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true" className="icon">
-    <path d="M9 8l6-3v14l-6-3H5V8z" />
-    <path d="M19 9a4 4 0 0 1 0 6" />
-  </svg>
-);
-
-export const IconDoc = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true" className="icon">
-    <path d="M7 3h7l5 5v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
-    <path d="M9 12h6M9 16h6" />
-  </svg>
-);
-
-export const IconGrid = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true" className="icon">
-    <rect x="4" y="4" width="7" height="7" rx="1" />
-    <rect x="13" y="4" width="7" height="7" rx="1" />
-    <rect x="4" y="13" width="7" height="7" rx="1" />
-    <rect x="13" y="13" width="7" height="7" rx="1" />
-  </svg>
-);
-
-export const IconList = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true" className="icon">
-    <path d="M8 6h12M8 12h12M8 18h12" />
-    <circle cx="5" cy="6" r="1" />
-    <circle cx="5" cy="12" r="1" />
-    <circle cx="5" cy="18" r="1" />
-  </svg>
-);
+export const IconFolder = () => <i className="bi bi-folder2 icon" aria-hidden="true" />;
+export const IconFile = () => <i className="bi bi-file-earmark icon" aria-hidden="true" />;
+export const IconImage = () => <i className="bi bi-image icon" aria-hidden="true" />;
+export const IconVideo = () => <i className="bi bi-film icon" aria-hidden="true" />;
+export const IconAudio = () => <i className="bi bi-music-note-beamed icon" aria-hidden="true" />;
+export const IconArchive = () => <i className="bi bi-file-zip icon" aria-hidden="true" />;
+export const IconDoc = () => <i className="bi bi-file-text icon" aria-hidden="true" />;
+export const IconGrid = () => <i className="bi bi-grid-3x3-gap icon" aria-hidden="true" />;
+export const IconList = () => <i className="bi bi-list icon" aria-hidden="true" />;
 
 export const iconForEntry = (entry) => {
   if (entry.isDir) return <IconFolder />;
+  if (entry.type === 'video') return <IconVideo />;
+  if (isArchiveEntry(entry)) return <IconArchive />;
   switch (entry.type) {
     case 'image':
       return <IconImage />;
-    case 'video':
-      return <IconVideo />;
     case 'audio':
       return <IconAudio />;
     case 'document':

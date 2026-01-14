@@ -98,11 +98,8 @@
 }
 
 .crumb .icon {
-  width: 16px;
-  height: 16px;
-  stroke: currentColor;
-  fill: none;
-  stroke-width: 1.7;
+  font-size: 16px;
+  line-height: 1;
 }
 
 .crumb.is-home {

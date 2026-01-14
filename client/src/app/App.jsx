@@ -35,6 +35,7 @@ export default function App() {
     filteredEntries,
     loadDirectory,
     handleToggle,
+    collapseAll,
     lastGoodPath
   } = useDirectoryData();
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -185,6 +186,7 @@ export default function App() {
           currentPath={currentPath}
           rootPath=""
           onToggle={handleToggle}
+          onCollapseAll={collapseAll}
           onNavigate={navigateTo}
           hideHeader={Boolean(status.error)}
         />

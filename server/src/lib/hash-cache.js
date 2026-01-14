@@ -262,6 +262,19 @@ export const loadHashCache = async () => {
 
 export const getHashEntry = (relativePath) => HASH_CACHE.get(relativePath) || null;
 
+export const getHashEntries = () => {
+  const entries = [];
+  for (const [relativePath, entry] of HASH_CACHE.entries()) {
+    entries.push({
+      path: relativePath,
+      hash: entry.hash,
+      mtimeMs: entry.mtimeMs,
+      size: entry.size ?? null
+    });
+  }
+  return entries;
+};
+
 export const hasHashEntry = (relativePath) => HASH_CACHE.has(relativePath);
 
 export const hasDirectoryEntry = (relativePath) =>

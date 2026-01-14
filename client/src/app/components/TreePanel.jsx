@@ -16,14 +16,7 @@ const TreeNode = ({ node, tree, currentPath, onToggle, onNavigate, isRoot = fals
             onClick={() => onToggle(node.path)}
             aria-label={node.expanded ? 'Collapse' : 'Expand'}
           >
-            <svg
-              className="tree-toggle-icon"
-              viewBox="0 0 16 16"
-              aria-hidden="true"
-              focusable="false"
-            >
-              <polyline points="6,4 10,8 6,12" />
-            </svg>
+            <i className="bi bi-chevron-right tree-toggle-icon" aria-hidden="true" />
           </button>
         ) : isRoot ? null : (
           <span className="tree-toggle placeholder" aria-hidden="true" />
@@ -32,7 +25,7 @@ const TreeNode = ({ node, tree, currentPath, onToggle, onNavigate, isRoot = fals
           <span className="tree-icon">
             <IconFolder />
           </span>
-          <span>{node.name || 'Archive'}</span>
+          <span className="tree-name">{node.name || 'Archive'}</span>
         </button>
       </div>
       {(isRoot || node.expanded) && hasChildren && (
@@ -58,7 +51,15 @@ const TreeNode = ({ node, tree, currentPath, onToggle, onNavigate, isRoot = fals
   );
 };
 
-const TreePanel = ({ tree, currentPath, rootPath, onToggle, onNavigate, hideHeader = false }) => {
+const TreePanel = ({
+  tree,
+  currentPath,
+  rootPath,
+  onToggle,
+  onNavigate,
+  onCollapseAll,
+  hideHeader = false
+}) => {
   const rootNode = tree[rootPath];
   if (!rootNode) return null;
   return (
@@ -67,6 +68,16 @@ const TreePanel = ({ tree, currentPath, rootPath, onToggle, onNavigate, hideHead
         <div>
           {!hideHeader && <span className="panel-title">Archive</span>}
         </div>
+        {!hideHeader && (
+          <button
+            type="button"
+            className="tree-collapse"
+            onClick={onCollapseAll}
+            aria-label="Collapse all folders"
+          >
+            <i className="bi bi-arrows-collapse icon" aria-hidden="true" />
+          </button>
+        )}
       </div>
       <div className="panel-body tree-scroll">
         <TreeNode

@@ -307,9 +307,8 @@
 }
 
 .lightbox-type-icon .icon {
-  width: 18px;
-  height: 18px;
-  stroke-width: 1.7;
+  font-size: 18px;
+  line-height: 1;
 }
 
 .lightbox-name {

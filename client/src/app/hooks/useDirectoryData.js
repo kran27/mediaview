@@ -19,7 +19,8 @@ export const useDirectoryData = () => {
     treePrefetchingRef,
     updateTreeWithEntries,
     expandAncestors,
-    toggleNode
+    toggleNode,
+    collapseAll
   } = useDirectoryTree();
   const {
     applyListing,
@@ -193,6 +194,7 @@ export const useDirectoryData = () => {
     handleSortClick,
     filteredEntries,
     loadDirectory,
-    handleToggle
+    handleToggle,
+    collapseAll
   };
 };

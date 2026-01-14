@@ -4,12 +4,6 @@ import { getDirectoryEntries, hasDirectoryEntry } from '../lib/hash-cache.js';
 import { isExcludedPath } from '../lib/exclude.js';
 import { decodePathSegments, sanitizeRequestPath } from '../lib/paths.js';
 import { buildStats } from '../lib/stats.js';
-import { enqueueThumbnailJobs } from '../lib/thumbnails.js';
-
-const collectThumbPaths = (entries) =>
-  entries
-    .filter((entry) => entry.type === 'image' || entry.type === 'video')
-    .map((entry) => entry.path);
 
 export const registerListRoute = (app) => {
   const getRequestPath = (req) => {
@@ -52,12 +46,6 @@ export const registerListRoute = (app) => {
       .forEach((entry) => {
         children[entry.path] = getDirectoryEntries(entry.path) || [];
       });
-
-    const thumbPaths = collectThumbPaths(entries);
-    Object.values(children).forEach((childEntries) => {
-      thumbPaths.push(...collectThumbPaths(childEntries));
-    });
-    enqueueThumbnailJobs(thumbPaths);
 
     res.json({
       root: {

@@ -1,5 +1,7 @@
 .icon {
-  stroke: currentColor;
-  fill: none;
-  stroke-width: 1.6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-size: 1em;
 }

@@ -101,6 +101,18 @@ export const useDirectoryTree = () => {
     }));
   }, []);
 
+  const collapseAll = useCallback(() => {
+    setTree((prev) => {
+      const next = {};
+      Object.values(prev).forEach((node) => {
+        if (!node) return;
+        const isRoot = node.path === '';
+        next[node.path] = { ...node, expanded: isRoot };
+      });
+      return next;
+    });
+  }, []);
+
   const fetchTree = useCallback(async () => {
     const response = await fetch(`${API_BASE}/api/tree`);
     if (!response.ok) {
@@ -137,6 +149,7 @@ export const useDirectoryTree = () => {
     treePrefetchingRef,
     updateTreeWithEntries,
     expandAncestors,
-    toggleNode
+    toggleNode,
+    collapseAll
   };
 };

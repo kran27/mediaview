@@ -40,9 +40,7 @@ const Breadcrumbs = ({ path, onNavigate }) => {
           onClick={() => onNavigate('')}
           aria-label="Home"
         >
-          <svg viewBox="0 0 24 24" className="icon" aria-hidden="true">
-            <path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z" />
-          </svg>
+          <i className="bi bi-house icon" aria-hidden="true" />
           <span className="crumb-label">Home</span>
         </button>
         {segments.map((segment, index) => {

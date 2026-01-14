@@ -1,11 +1,34 @@
 import { useEffect, useRef, useState } from 'react';
 import { buildFileUrl } from '../lib/api.js';
 import { formatSize } from '../lib/format.js';
-import { isViewableEntry } from '../lib/fileTypes.js';
+import { getEntryExtension, isViewableEntry } from '../lib/fileTypes.js';
 import { iconForEntry } from './components/index.js';
 
 const LARGE_FILE_THRESHOLD_BYTES = 10 * 1024 * 1024;
 const TEXT_PREVIEW_BYTES = 64 * 1024;
+const VIDEO_MIME_TYPES = {
+  '.mp4': 'video/mp4',
+  '.m4v': 'video/mp4',
+  '.webm': 'video/webm',
+  '.mov': 'video/quicktime',
+  '.mkv': 'video/x-matroska',
+  '.avi': 'video/x-msvideo',
+  '.wmv': 'video/x-ms-wmv',
+  '.flv': 'video/x-flv',
+  '.mpg': 'video/mpeg',
+  '.mpeg': 'video/mpeg'
+};
+
+const isVideoPlayable = (entry) => {
+  if (entry?.type !== 'video') return true;
+  if (typeof document === 'undefined') return true;
+  const ext = getEntryExtension(entry);
+  const mimeType = VIDEO_MIME_TYPES[ext];
+  if (!mimeType) return true;
+  const probe = document.createElement('video');
+  const result = probe.canPlayType(mimeType);
+  return result === '' || result === 'probably' || result === 'maybe';
+};
 
 const Lightbox = ({
   open,
@@ -25,24 +48,29 @@ const Lightbox = ({
     error: ''
   });
   const [largeFileWarningDismissed, setLargeFileWarningDismissed] = useState(false);
+  const [videoPreviewFailed, setVideoPreviewFailed] = useState(false);
   const imageRef = useRef(null);
   const videoRef = useRef(null);
   const lightboxRef = useRef(null);
   const toolbarRef = useRef(null);
 
-  const isStreamable = selectedEntry?.type === 'video'
-    || selectedEntry?.type === 'audio';
-  const shouldShowDimensions = selectedEntry?.type === 'image' || selectedEntry?.type === 'video';
+  const isVideo = selectedEntry?.type === 'video';
+  const isImage = selectedEntry?.type === 'image';
+  const isStreamable = isVideo || selectedEntry?.type === 'audio';
+  const shouldShowDimensions = isImage || isVideo;
   const hasDimensions = Number.isFinite(mediaMeta.width) && Number.isFinite(mediaMeta.height);
   const placeholderDimensions = '-- × --';
   const isLargeFile = Number.isFinite(selectedEntry?.size)
     && selectedEntry.size >= LARGE_FILE_THRESHOLD_BYTES;
-  const shouldWarnLargeFile = isLargeFile && !isStreamable;
+  const canPreviewVideo = !isVideo || (isVideoPlayable(selectedEntry) && !videoPreviewFailed);
+  const canPreviewEntry = isViewableEntry(selectedEntry) && canPreviewVideo;
+  const shouldWarnLargeFile = isLargeFile && !isStreamable && canPreviewEntry;
   const shouldGateLargeFile = shouldWarnLargeFile && !largeFileWarningDismissed;
 
   useEffect(() => {
     if (!open) {
       setLargeFileWarningDismissed(false);
+      setVideoPreviewFailed(false);
       return;
     }
     if (selectedEntry?.isDir) {
@@ -53,11 +81,12 @@ const Lightbox = ({
     setLargeFileWarningDismissed(false);
     setMediaLoading(false);
     setMediaMeta({ width: null, height: null, duration: null });
+    setVideoPreviewFailed(false);
   }, [onClose, open, selectedEntry]);
 
   useEffect(() => {
     if (!open || !selectedEntry) return;
-    if (selectedEntry.type === 'image' && imageRef.current?.complete) {
+    if (isImage && imageRef.current?.complete) {
       setMediaLoading(false);
       setMediaMeta({
         width: imageRef.current.naturalWidth,
@@ -65,7 +94,7 @@ const Lightbox = ({
         duration: null
       });
     }
-    if (selectedEntry.type === 'video' && videoRef.current?.readyState >= 2) {
+    if (isVideo && videoRef.current?.readyState >= 2) {
       setMediaLoading(false);
       setMediaMeta({
         width: videoRef.current.videoWidth,
@@ -73,13 +102,13 @@ const Lightbox = ({
         duration: videoRef.current.duration
       });
     }
-  }, [open, selectedEntry]);
+  }, [open, selectedEntry, isImage, isVideo]);
 
   useEffect(() => {
     if (!open || !selectedEntry) return undefined;
-    if (selectedEntry.type !== 'image' && selectedEntry.type !== 'video') return undefined;
+    if (!isImage && !isVideo) return undefined;
     const frameId = requestAnimationFrame(() => {
-      if (selectedEntry.type === 'image') {
+      if (isImage) {
         const img = imageRef.current;
         if (!img) return;
         setMediaLoading(!(img.complete && img.naturalWidth > 0));
@@ -92,7 +121,7 @@ const Lightbox = ({
     return () => {
       cancelAnimationFrame(frameId);
     };
-  }, [open, selectedEntry]);
+  }, [open, selectedEntry, isImage, isVideo]);
 
   useEffect(() => {
     if (!open || !selectedEntry || selectedEntry.type !== 'text') {
@@ -229,10 +258,10 @@ const Lightbox = ({
               </div>
             </div>
           )}
-          {!shouldGateLargeFile && (selectedEntry.type === 'image' || selectedEntry.type === 'video') && (
+          {!shouldGateLargeFile && canPreviewVideo && (isImage || isVideo) && (
             <div className={`lightbox-media${mediaLoading ? ' is-loading' : ''}`}>
               {mediaLoading && <div className="media-loader" aria-hidden="true" />}
-              {selectedEntry.type === 'image' && (
+              {isImage && (
                 <img
                   key={previewSource}
                   ref={imageRef}
@@ -252,7 +281,7 @@ const Lightbox = ({
                   }}
                 />
               )}
-              {selectedEntry.type === 'video' && (
+              {isVideo && (
                 <video
                   controls
                   autoPlay
@@ -268,7 +297,10 @@ const Lightbox = ({
                     });
                   }}
                   onLoadedData={() => setMediaLoading(false)}
-                  onError={() => setMediaLoading(false)}
+                  onError={() => {
+                    setMediaLoading(false);
+                    setVideoPreviewFailed(true);
+                  }}
                 />
               )}
             </div>
@@ -309,7 +341,7 @@ const Lightbox = ({
               )}
             </div>
           )}
-          {!shouldGateLargeFile && !isViewableEntry(selectedEntry) && (
+          {!shouldGateLargeFile && (!isViewableEntry(selectedEntry) || !canPreviewVideo) && (
             <div className="lightbox-unknown">
               <div className="lightbox-unknown-title">Preview unavailable</div>
               <div className="lightbox-unknown-copy">

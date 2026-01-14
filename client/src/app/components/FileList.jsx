@@ -3,13 +3,16 @@ import { buildThumbUrl } from '../../lib/api.js';
 import { formatSize } from '../../lib/format.js';
 import { iconForEntry } from './Icons.jsx';
 
-const GRID_THUMB_SIZES = {
-  sm: '(max-width: 720px) 88px, (max-width: 1100px) 96px, 100px',
-  md: '(max-width: 720px) 140px, (max-width: 1100px) 160px, 180px',
-  lg: '(max-width: 720px) 200px, (max-width: 1100px) 230px, 260px'
-};
 const LIST_THUMB_SIZES = '32px';
 const THUMB_WIDTHS = { sm: 200, md: 400, lg: 600 };
+
+const handleThumbLoad = (event) => {
+  event.currentTarget.classList.add('loaded');
+};
+
+const handleThumbError = (event) => {
+  event.currentTarget.classList.add('thumb-failed');
+};
 
 const buildThumbSrcSet = (pathValue) => ([
   `${buildThumbUrl(pathValue, 'sm')} ${THUMB_WIDTHS.sm}w`,
@@ -17,17 +20,47 @@ const buildThumbSrcSet = (pathValue) => ([
   `${buildThumbUrl(pathValue, 'lg')} ${THUMB_WIDTHS.lg}w`
 ].join(', '));
 
+const renderThumbStack = ({
+  entry,
+  sizes,
+  wrapperClassName,
+  imgClassName,
+  iconClassName,
+  iconTag: IconTag
+}) => (
+  <div className={wrapperClassName}>
+    <img
+      className={imgClassName}
+      src={buildThumbUrl(entry.path, 'sm')}
+      srcSet={buildThumbSrcSet(entry.path)}
+      sizes={sizes}
+      alt={entry.name}
+      loading="lazy"
+      onLoad={handleThumbLoad}
+      onError={handleThumbError}
+    />
+    <IconTag className={iconClassName}>{iconForEntry(entry)}</IconTag>
+  </div>
+);
+
 const FileList = ({
   entries,
   viewMode,
   onSelect,
-  selectedPath,
-  zoomLevel
+  selectedPath
 }) => {
   if (viewMode === 'grid') {
-    const gridSizes = GRID_THUMB_SIZES[zoomLevel] || GRID_THUMB_SIZES.md;
-    const folders = entries.filter((entry) => entry.isDir);
-    const files = entries.filter((entry) => !entry.isDir);
+    const folders = [];
+    const files = [];
+
+    entries.forEach((entry) => {
+      if (entry.isDir) {
+        folders.push(entry);
+      } else {
+        files.push(entry);
+      }
+    });
+
     return (
       <div className="grid-sections">
         {folders.length > 0 && (
@@ -57,6 +90,7 @@ const FileList = ({
         <div className="grid grid-files">
           {files.map((entry, index) => {
             const isSelected = entry.path === selectedPath;
+            const hasPreview = entry.type === 'image' || entry.type === 'video';
             return (
               <button
                 type="button"
@@ -66,43 +100,15 @@ const FileList = ({
                 style={{ '--index': index }}
               >
                 <div className="thumb">
-                  {entry.type === 'image' && (
-                    <div className="thumb-stack">
-                      <img
-                        src={buildThumbUrl(entry.path, 'sm')}
-                        srcSet={buildThumbSrcSet(entry.path)}
-                        sizes={gridSizes}
-                        alt={entry.name}
-                        loading="lazy"
-                        onLoad={(event) => {
-                          event.currentTarget.classList.add('loaded');
-                        }}
-                        onError={(event) => {
-                          event.currentTarget.classList.add('thumb-failed');
-                        }}
-                      />
-                      <div className="thumb-icon">{iconForEntry(entry)}</div>
-                    </div>
-                  )}
-                  {entry.type === 'video' && (
-                    <div className="thumb-stack">
-                      <img
-                        src={buildThumbUrl(entry.path, 'sm')}
-                        srcSet={buildThumbSrcSet(entry.path)}
-                        sizes={gridSizes}
-                        alt={entry.name}
-                        loading="lazy"
-                        onLoad={(event) => {
-                          event.currentTarget.classList.add('loaded');
-                        }}
-                        onError={(event) => {
-                          event.currentTarget.classList.add('thumb-failed');
-                        }}
-                      />
-                      <div className="thumb-icon">{iconForEntry(entry)}</div>
-                    </div>
-                  )}
-                  {entry.type !== 'image' && entry.type !== 'video' && (
+                  {hasPreview && renderThumbStack({
+                    entry,
+                    sizes: 'auto',
+                    wrapperClassName: 'thumb-stack',
+                    imgClassName: undefined,
+                    iconClassName: 'thumb-icon',
+                    iconTag: 'div'
+                  })}
+                  {!hasPreview && (
                     <div className="thumb-icon">{iconForEntry(entry)}</div>
                   )}
                 </div>
@@ -127,6 +133,7 @@ const FileList = ({
       <div className="list-body">
         {entries.map((entry, index) => {
           const isSelected = entry.path === selectedPath;
+          const hasPreview = entry.type === 'image' || entry.type === 'video';
           return (
             <button
               type="button"
@@ -137,45 +144,15 @@ const FileList = ({
             >
               <span className="list-cell name">
                 <span className="list-icon">
-                  {entry.type === 'image' && (
-                    <div className="list-thumb-stack">
-                      <img
-                        className="list-thumb"
-                        src={buildThumbUrl(entry.path, 'sm')}
-                        srcSet={buildThumbSrcSet(entry.path)}
-                        sizes={LIST_THUMB_SIZES}
-                        alt={entry.name}
-                        loading="lazy"
-                        onLoad={(event) => {
-                          event.currentTarget.classList.add('loaded');
-                        }}
-                        onError={(event) => {
-                          event.currentTarget.classList.add('thumb-failed');
-                        }}
-                      />
-                      <span className="list-thumb-icon">{iconForEntry(entry)}</span>
-                    </div>
-                  )}
-                  {entry.type === 'video' && (
-                    <div className="list-thumb-stack">
-                      <img
-                        className="list-thumb"
-                        src={buildThumbUrl(entry.path, 'sm')}
-                        srcSet={buildThumbSrcSet(entry.path)}
-                        sizes={LIST_THUMB_SIZES}
-                        alt={entry.name}
-                        loading="lazy"
-                        onLoad={(event) => {
-                          event.currentTarget.classList.add('loaded');
-                        }}
-                        onError={(event) => {
-                          event.currentTarget.classList.add('thumb-failed');
-                        }}
-                      />
-                      <span className="list-thumb-icon">{iconForEntry(entry)}</span>
-                    </div>
-                  )}
-                  {entry.type !== 'image' && entry.type !== 'video' && iconForEntry(entry)}
+                  {hasPreview && renderThumbStack({
+                    entry,
+                    sizes: LIST_THUMB_SIZES,
+                    wrapperClassName: 'list-thumb-stack',
+                    imgClassName: 'list-thumb',
+                    iconClassName: 'list-thumb-icon',
+                    iconTag: 'span'
+                  })}
+                  {!hasPreview && iconForEntry(entry)}
                 </span>
                 {entry.name}
               </span>

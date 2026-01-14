@@ -8,7 +8,7 @@ import { isExcludedPath } from '../lib/exclude.js';
 import { matchesEtag } from '../lib/http.js';
 import { decodePathSegments, resolveSafePath, sanitizeRequestPath } from '../lib/paths.js';
 import { getHashEntry, hasHashEntry } from '../lib/hash-cache.js';
-import { enqueueThumbnailJobs, getThumbPath } from '../lib/thumbnails.js';
+import { getThumbPath } from '../lib/thumbnails.js';
 
 const parseThumbnailRequest = (req) => {
   if (typeof req.params.size === 'string' && (typeof req.params.path === 'string' || Array.isArray(req.params.path))) {
@@ -87,8 +87,7 @@ export const registerThumbnailRoute = (app) => {
       const hash = cached.hash;
       const thumbPath = getThumbPath(hash, size, path.basename(requestPath));
       if (!fs.existsSync(thumbPath)) {
-        enqueueThumbnailJobs([requestPath]);
-        res.status(404).json({ error: 'Thumbnail not ready' });
+        res.status(404).json({ error: 'Thumbnail not found' });
         return;
       }
       const mimeType = mime.lookup(thumbPath) || 'application/octet-stream';

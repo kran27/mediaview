@@ -25,6 +25,9 @@ let watching = false;
 let scanning = false;
 let scanQueued = false;
 let scanId = 0;
+let progressTimer = null;
+let processedFileCount = 0;
+let currentFilePath = '';
 const cache = new Map();
 
 const toPosix = (value) => value.split(path.sep).join('/');
@@ -148,6 +151,8 @@ const scanTree = async (currentScanId) => {
           continue;
         }
         if (!dirent.isFile()) continue;
+        processedFileCount += 1;
+        currentFilePath = relativePath;
         const filePath = path.join(rootDir, relativePath);
         let stats;
         try {
@@ -290,6 +295,16 @@ const runScan = async () => {
     fallbackTimer = null;
   }
   scanning = true;
+  processedFileCount = 0;
+  currentFilePath = '';
+  if (!progressTimer) {
+    progressTimer = setInterval(() => {
+      const currentLabel = currentFilePath || 'pending';
+      console.log(
+        `Scan progress: ${processedFileCount} files processed, current ${currentLabel}`
+      );
+    }, 10 * 1000);
+  }
   const currentScanId = scanId + 1;
   scanId = currentScanId;
   const startedAt = Date.now();
@@ -314,6 +329,10 @@ const runScan = async () => {
     console.log(
       `Scan complete: ${changedFiles} files changed (updated ${result.fileUpdatedCount || 0}, removed ${result.fileRemovedCount || 0}), ${changedDirs} dirs changed (updated ${result.dirUpdatedCount || 0}, removed ${result.dirRemovedCount || 0})`
     );
+  }
+  if (progressTimer) {
+    clearInterval(progressTimer);
+    progressTimer = null;
   }
   scanning = false;
   if (scanQueued) {

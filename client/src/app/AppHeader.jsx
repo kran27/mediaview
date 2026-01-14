@@ -62,10 +62,7 @@ const AppHeader = ({
         <div className="search">
           <button type="button" className="search-toggle" onClick={handleSearchOpen}>
             <span className="search-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" className="icon">
-                <circle cx="11" cy="11" r="7" />
-                <path d="M20 20l-3.5-3.5" />
-              </svg>
+              <i className="bi bi-search icon" aria-hidden="true" />
             </span>
             <span className="search-label-full">Search in this folder</span>
             <span className="search-label-short">Search</span>

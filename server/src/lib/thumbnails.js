@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -9,11 +10,18 @@ import {
   THUMB_EXT,
   THUMB_SIZES
 } from '../config.js';
-import { getHashEntry, onHashScanComplete } from './hash-cache.js';
+import { isThumbablePath } from './classify.js';
+import { getHashEntries, getHashEntry, onHashScanComplete } from './hash-cache.js';
 
 const WORKER_POOL_LIMIT = 4;
+const VERIFY_THUMBS_INTERVAL_MS = 60 * 60 * 1000;
+const POST_SCAN_VERIFY_DELAY_MS = 5 * 1000;
 const thumbnailWorkers = [];
 let unsubscribeScanComplete = null;
+let verifyTimer = null;
+let verifyingThumbs = false;
+let postScanVerifyTimer = null;
+let initialScanVerified = false;
 
 const ensureThumbDir = async () => {
   try {
@@ -55,6 +63,43 @@ export const enqueueThumbnailJobs = (paths) => {
     if (!worker) return;
     worker.postMessage({ type: 'enqueue', entries: bucketEntries });
   });
+};
+
+const verifyThumbnailCoverage = () => {
+  if (thumbnailWorkers.length === 0 || verifyingThumbs) return;
+  verifyingThumbs = true;
+  try {
+    const candidates = [];
+    const sizeKeys = Object.keys(THUMB_SIZES);
+    const entries = getHashEntries();
+    entries.forEach((entry) => {
+      if (!entry?.path || !entry?.hash) return;
+      if (!isThumbablePath(entry.path)) return;
+      const originalName = path.basename(entry.path);
+      const missing = sizeKeys.some((sizeKey) => {
+        const thumbPath = getThumbPath(entry.hash, sizeKey, originalName);
+        return !fs.existsSync(thumbPath);
+      });
+      if (missing) {
+        candidates.push(entry.path);
+      }
+    });
+    if (candidates.length > 0) {
+      enqueueThumbnailJobs(candidates);
+    }
+  } finally {
+    verifyingThumbs = false;
+  }
+};
+
+const schedulePostScanVerify = () => {
+  if (postScanVerifyTimer) {
+    clearTimeout(postScanVerifyTimer);
+  }
+  postScanVerifyTimer = setTimeout(() => {
+    postScanVerifyTimer = null;
+    verifyThumbnailCoverage();
+  }, POST_SCAN_VERIFY_DELAY_MS);
 };
 
 const getWorkerCount = () => {
@@ -126,9 +171,22 @@ export const startThumbnailWorker = async () => {
     }
     unsubscribeScanComplete?.();
     unsubscribeScanComplete = onHashScanComplete(({ updates, removals }) => {
-      if (updates.length === 0 && removals.length === 0) return;
-      dispatchSync(updates, removals);
+      const hasChanges = updates.length > 0 || removals.length > 0;
+      if (hasChanges) {
+        dispatchSync(updates, removals);
+      }
+      if (!initialScanVerified) {
+        initialScanVerified = true;
+        schedulePostScanVerify();
+        return;
+      }
+      if (hasChanges) {
+        schedulePostScanVerify();
+      }
     });
+    if (!verifyTimer) {
+      verifyTimer = setInterval(verifyThumbnailCoverage, VERIFY_THUMBS_INTERVAL_MS);
+    }
   } catch (error) {
     console.error('Failed to start thumbnail worker', error);
   }
