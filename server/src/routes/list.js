@@ -50,15 +50,15 @@ export const registerListRoute = (app) => {
     res.json({
       root: {
         name: ROOT_NAME,
-        path: ''
+        path: '',
       },
       current: {
         name: requestPath ? path.posix.basename(requestPath) : ROOT_NAME,
-        path: requestPath
+        path: requestPath,
       },
       stats,
       entries,
-      children
+      children,
     });
   };
 

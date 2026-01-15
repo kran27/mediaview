@@ -1,11 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
+import DOMPurify from 'dompurify';
+import MarkdownIt from 'markdown-it';
 import { buildFileUrl } from '../lib/api.js';
 import { formatSize } from '../lib/format.js';
-import { getEntryExtension, isViewableEntry } from '../lib/fileTypes.js';
+import {
+  getEntryExtension,
+  isAudioEntry,
+  isDocumentEntry,
+  isImageEntry,
+  isTextEntry,
+  isVideoEntry,
+  isViewableEntry
+} from '../lib/fileTypes.js';
 import { iconForEntry } from './components/index.js';
 
 const LARGE_FILE_THRESHOLD_BYTES = 10 * 1024 * 1024;
-const TEXT_PREVIEW_BYTES = 64 * 1024;
+const TEXT_PREVIEW_MAX_BYTES = 5 * 1024 * 1024;
+const markdownRenderer = new MarkdownIt({ html: false, linkify: true, breaks: true });
 const VIDEO_MIME_TYPES = {
   '.mp4': 'video/mp4',
   '.m4v': 'video/mp4',
@@ -13,21 +24,104 @@ const VIDEO_MIME_TYPES = {
   '.mov': 'video/quicktime',
   '.mkv': 'video/x-matroska',
   '.avi': 'video/x-msvideo',
+  '.asf': 'video/x-ms-asf',
   '.wmv': 'video/x-ms-wmv',
   '.flv': 'video/x-flv',
+  '.f4v': 'video/x-f4v',
   '.mpg': 'video/mpeg',
-  '.mpeg': 'video/mpeg'
+  '.mpeg': 'video/mpeg',
+  '.3gp': 'video/3gpp',
+  '.3g2': 'video/3gpp2',
+  '.ogv': 'video/ogg',
+  '.mts': 'video/mp2t',
+  '.m2ts': 'video/mp2t',
+  '.ts': 'video/mp2t',
+  '.vob': 'video/mpeg',
+  '.rm': 'video/vnd.rn-realvideo',
+  '.rmvb': 'video/vnd.rn-realvideo',
+  '.mxf': 'video/mxf',
+  '.m1v': 'video/mpeg',
+  '.m2v': 'video/mpeg'
+};
+const IMAGE_MIME_TYPES = {
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.bmp': 'image/bmp',
+  '.svg': 'image/svg+xml',
+  '.avif': 'image/avif',
+  '.tiff': 'image/tiff',
+  '.tif': 'image/tiff',
+  '.heic': 'image/heic',
+  '.ico': 'image/x-icon'
+};
+const AUDIO_MIME_TYPES = {
+  '.mp3': 'audio/mpeg',
+  '.m4a': 'audio/mp4',
+  '.aac': 'audio/aac',
+  '.wav': 'audio/wav',
+  '.flac': 'audio/flac',
+  '.ogg': 'audio/ogg',
+  '.wma': 'audio/x-ms-wma',
+  '.alac': 'audio/x-alac',
+  '.aiff': 'audio/aiff'
 };
 
+const renderMarkdown = (value) => DOMPurify.sanitize(markdownRenderer.render(value));
+
 const isVideoPlayable = (entry) => {
-  if (entry?.type !== 'video') return true;
+  if (!isVideoEntry(entry)) return true;
   if (typeof document === 'undefined') return true;
   const ext = getEntryExtension(entry);
+  if (ext === '.mkv') return true;
   const mimeType = VIDEO_MIME_TYPES[ext];
   if (!mimeType) return true;
   const probe = document.createElement('video');
   const result = probe.canPlayType(mimeType);
-  return result === '' || result === 'probably' || result === 'maybe';
+  console.log('Video playability for', entry.name, '(', mimeType, '):', result);
+  return result === 'probably' || result === 'maybe';
+};
+
+const imageSupportCache = new Map();
+const supportsImageMime = (mimeType) => {
+  if (imageSupportCache.has(mimeType)) {
+    return imageSupportCache.get(mimeType);
+  }
+  let supported = true;
+  if (mimeType === 'image/webp' || mimeType === 'image/avif') {
+    try {
+      const canvas = document.createElement('canvas');
+      const dataUrl = canvas.toDataURL(mimeType);
+      supported = dataUrl.startsWith(`data:${mimeType}`);
+    } catch (error) {
+      supported = false;
+    }
+  }
+  imageSupportCache.set(mimeType, supported);
+  return supported;
+};
+
+const isImagePlayable = (entry) => {
+  if (!isImageEntry(entry)) return true;
+  if (typeof document === 'undefined') return true;
+  const ext = getEntryExtension(entry);
+  const mimeType = IMAGE_MIME_TYPES[ext];
+  if (!mimeType) return true;
+  return supportsImageMime(mimeType);
+};
+
+const isAudioPlayable = (entry) => {
+  if (!isAudioEntry(entry)) return true;
+  if (typeof document === 'undefined') return true;
+  const ext = getEntryExtension(entry);
+  const mimeType = AUDIO_MIME_TYPES[ext];
+  if (!mimeType) return true;
+  const probe = document.createElement('audio');
+  const result = probe.canPlayType(mimeType);
+  console.log('Audio playability for', entry.name, '(', mimeType, '):', result);
+  return result === 'probably' || result === 'maybe';
 };
 
 const Lightbox = ({
@@ -44,26 +138,43 @@ const Lightbox = ({
   const [textPreview, setTextPreview] = useState({
     status: 'idle',
     content: '',
+    html: '',
     truncated: false,
     error: ''
   });
   const [largeFileWarningDismissed, setLargeFileWarningDismissed] = useState(false);
   const [videoPreviewFailed, setVideoPreviewFailed] = useState(false);
+  const [imagePreviewFailed, setImagePreviewFailed] = useState(false);
   const imageRef = useRef(null);
   const videoRef = useRef(null);
   const lightboxRef = useRef(null);
   const toolbarRef = useRef(null);
 
-  const isVideo = selectedEntry?.type === 'video';
-  const isImage = selectedEntry?.type === 'image';
-  const isStreamable = isVideo || selectedEntry?.type === 'audio';
+  const isVideo = isVideoEntry(selectedEntry);
+  const isImage = isImageEntry(selectedEntry);
+  const isSvg = isImage && getEntryExtension(selectedEntry) === '.svg';
+  const isAudio = isAudioEntry(selectedEntry);
+  const isDocument = isDocumentEntry(selectedEntry);
+  const isText = isTextEntry(selectedEntry);
+  const isStreamable = isVideo || isAudio;
+  const isMarkdown = isText && getEntryExtension(selectedEntry) === '.md';
   const shouldShowDimensions = isImage || isVideo;
   const hasDimensions = Number.isFinite(mediaMeta.width) && Number.isFinite(mediaMeta.height);
   const placeholderDimensions = '-- × --';
   const isLargeFile = Number.isFinite(selectedEntry?.size)
     && selectedEntry.size >= LARGE_FILE_THRESHOLD_BYTES;
+  const isLargeText = isText
+    && Number.isFinite(selectedEntry?.size)
+    && selectedEntry.size > TEXT_PREVIEW_MAX_BYTES;
+  const canPreviewText = !isLargeText;
   const canPreviewVideo = !isVideo || (isVideoPlayable(selectedEntry) && !videoPreviewFailed);
-  const canPreviewEntry = isViewableEntry(selectedEntry) && canPreviewVideo;
+  const canPreviewImage = !isImage || (isImagePlayable(selectedEntry) && !imagePreviewFailed);
+  const canPreviewAudio = !isAudio || isAudioPlayable(selectedEntry);
+  const canPreviewEntry = isViewableEntry(selectedEntry)
+    && canPreviewVideo
+    && canPreviewImage
+    && canPreviewAudio
+    && canPreviewText;
   const shouldWarnLargeFile = isLargeFile && !isStreamable && canPreviewEntry;
   const shouldGateLargeFile = shouldWarnLargeFile && !largeFileWarningDismissed;
 
@@ -71,6 +182,7 @@ const Lightbox = ({
     if (!open) {
       setLargeFileWarningDismissed(false);
       setVideoPreviewFailed(false);
+      setImagePreviewFailed(false);
       return;
     }
     if (selectedEntry?.isDir) {
@@ -82,6 +194,7 @@ const Lightbox = ({
     setMediaLoading(false);
     setMediaMeta({ width: null, height: null, duration: null });
     setVideoPreviewFailed(false);
+    setImagePreviewFailed(false);
   }, [onClose, open, selectedEntry]);
 
   useEffect(() => {
@@ -124,21 +237,19 @@ const Lightbox = ({
   }, [open, selectedEntry, isImage, isVideo]);
 
   useEffect(() => {
-    if (!open || !selectedEntry || selectedEntry.type !== 'text') {
-      setTextPreview({ status: 'idle', content: '', truncated: false, error: '' });
+    if (!open || !selectedEntry || !isText) {
+      setTextPreview({ status: 'idle', content: '', html: '', truncated: false, error: '' });
       return undefined;
     }
-    if (shouldGateLargeFile) {
-      setTextPreview({ status: 'idle', content: '', truncated: false, error: '' });
+    if (shouldGateLargeFile || !canPreviewText) {
+      setTextPreview({ status: 'idle', content: '', html: '', truncated: false, error: '' });
       return undefined;
     }
     let isActive = true;
     const loadText = async () => {
-      setTextPreview({ status: 'loading', content: '', truncated: false, error: '' });
+      setTextPreview({ status: 'loading', content: '', html: '', truncated: false, error: '' });
       try {
-        const response = await fetch(buildFileUrl(selectedEntry.path), {
-          headers: { Range: `bytes=0-${TEXT_PREVIEW_BYTES - 1}` }
-        });
+        const response = await fetch(buildFileUrl(selectedEntry.path));
         if (!response.ok) {
           throw new Error('Failed to load text preview');
         }
@@ -147,7 +258,8 @@ const Lightbox = ({
         setTextPreview({
           status: 'ready',
           content,
-          truncated: response.status === 206,
+          html: isMarkdown ? renderMarkdown(content) : '',
+          truncated: false,
           error: ''
         });
       } catch (error) {
@@ -155,6 +267,7 @@ const Lightbox = ({
         setTextPreview({
           status: 'error',
           content: '',
+          html: '',
           truncated: false,
           error: error.message
         });
@@ -164,7 +277,7 @@ const Lightbox = ({
     return () => {
       isActive = false;
     };
-  }, [open, selectedEntry, shouldGateLargeFile]);
+  }, [open, selectedEntry, shouldGateLargeFile, canPreviewText, isText, isMarkdown]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -226,7 +339,7 @@ const Lightbox = ({
       <button type="button" className="lightbox-backdrop" onClick={onClose} aria-label="Close preview" />
       <div className="lightbox-stage">
         <div
-          className={`lightbox-body${selectedEntry.type === 'document' ? ' is-document' : ''}${mediaLoading ? ' is-loading' : ''}`}
+          className={`lightbox-body${isDocument ? ' is-document' : ''}${mediaLoading ? ' is-loading' : ''}`}
         >
           <button
             type="button"
@@ -258,8 +371,8 @@ const Lightbox = ({
               </div>
             </div>
           )}
-          {!shouldGateLargeFile && canPreviewVideo && (isImage || isVideo) && (
-            <div className={`lightbox-media${mediaLoading ? ' is-loading' : ''}`}>
+          {!shouldGateLargeFile && canPreviewVideo && canPreviewImage && (isImage || isVideo) && (
+            <div className={`lightbox-media${mediaLoading ? ' is-loading' : ''}${isSvg ? ' is-svg' : ''}`}>
               {mediaLoading && <div className="media-loader" aria-hidden="true" />}
               {isImage && (
                 <img
@@ -278,6 +391,7 @@ const Lightbox = ({
                   }}
                   onError={() => {
                     setMediaLoading(false);
+                    setImagePreviewFailed(true);
                   }}
                 />
               )}
@@ -305,7 +419,7 @@ const Lightbox = ({
               )}
             </div>
           )}
-          {!shouldGateLargeFile && selectedEntry.type === 'audio' && (
+          {!shouldGateLargeFile && isAudio && canPreviewAudio && (
             <audio
               controls
               autoPlay
@@ -320,15 +434,15 @@ const Lightbox = ({
               }}
             />
           )}
-          {!shouldGateLargeFile && selectedEntry.type === 'document' && (
+          {!shouldGateLargeFile && isDocument && (
             <iframe
               className="lightbox-iframe"
               src={previewSource}
               title={selectedEntry.name}
             />
           )}
-          {!shouldGateLargeFile && selectedEntry.type === 'text' && (
-            <div className="lightbox-text">
+          {!shouldGateLargeFile && isText && (
+            <div className={`lightbox-text${isMarkdown ? ' lightbox-markdown' : ''}`}>
               {textPreview.status === 'loading' && <div>Loading preview...</div>}
               {textPreview.status === 'error' && (
                 <div className="lightbox-error">{textPreview.error}</div>
@@ -336,12 +450,19 @@ const Lightbox = ({
               {textPreview.status === 'ready' && (
                 <>
                   {textPreview.truncated && <div className="lightbox-note">Showing first 64 KB.</div>}
-                  <pre>{textPreview.content}</pre>
+                  {isMarkdown ? (
+                    <div
+                      className="lightbox-markdown-body"
+                      dangerouslySetInnerHTML={{ __html: textPreview.html }}
+                    />
+                  ) : (
+                    <pre>{textPreview.content}</pre>
+                  )}
                 </>
               )}
             </div>
           )}
-          {!shouldGateLargeFile && (!isViewableEntry(selectedEntry) || !canPreviewVideo) && (
+          {!shouldGateLargeFile && !canPreviewEntry && (
             <div className="lightbox-unknown">
               <div className="lightbox-unknown-title">Preview unavailable</div>
               <div className="lightbox-unknown-copy">

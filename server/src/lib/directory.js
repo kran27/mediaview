@@ -26,7 +26,7 @@ export const readDirectory = async (relativePath) => {
         isDir: dirent.isDirectory(),
         size: dirent.isDirectory() ? null : entryStats.size,
         ext,
-        type: entryType
+        type: entryType,
       };
     })
   );

@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import { Worker } from 'node:worker_threads';
@@ -6,7 +7,7 @@ import {
   EXCLUDE_PATTERNS,
   HASH_CACHE_SCAN_INTERVAL_MS,
   ROOT_DIR,
-  ROOT_NAME
+  ROOT_NAME,
 } from '../config.js';
 import { classifyFile } from './classify.js';
 
@@ -20,6 +21,8 @@ const DIR_CHILDREN = new Map();
 const hashListeners = new Set();
 const scanListeners = new Set();
 let cacheWorker = null;
+let cacheFileWatcher = null;
+let cacheWatchTimer = null;
 let flushTimer = null;
 let flushing = false;
 let unsubscribeWorkerUpdates = null;
@@ -31,10 +34,11 @@ const cacheStatus = {
   lastScanEnd: null,
   lastScanDurationMs: null,
   lastScanUpdates: 0,
-  lastScanRemovals: 0
+  lastScanRemovals: 0,
 };
 const pendingThumbUpdates = new Map();
 const pendingThumbRemovals = new Map();
+const CACHE_WATCH_DEBOUNCE_MS = 200;
 
 const getParentPath = (relativePath) => {
   if (!relativePath) return null;
@@ -55,7 +59,7 @@ const ensureDirEntry = (relativePath) => {
       isDir: true,
       size: null,
       ext: '',
-      type: 'dir'
+      type: 'dir',
     });
   }
   if (!DIR_CHILDREN.has(key)) {
@@ -77,7 +81,7 @@ const upsertFileEntry = (relativePath, entry) => {
     isDir: false,
     size: entry.size ?? null,
     ext,
-    type: classifyFile(ext)
+    type: classifyFile(ext),
   });
   const parentPath = getParentPath(relativePath);
   if (parentPath !== null) {
@@ -156,6 +160,30 @@ const scheduleFlush = () => {
   }, 500);
 };
 
+const resetCacheState = () => {
+  HASH_CACHE.clear();
+  ENTRY_INDEX.clear();
+  DIR_CHILDREN.clear();
+  pendingThumbUpdates.clear();
+  pendingThumbRemovals.clear();
+  ensureDirEntry('');
+  dirtyGeneration = 0;
+  flushedGeneration = 0;
+};
+
+const applyCacheEntries = (entries) => {
+  resetCacheState();
+  Object.entries(entries).forEach(([relativePath, entry]) => {
+    if (!entry?.hash || !Number.isFinite(entry.mtimeMs)) return;
+    HASH_CACHE.set(relativePath, {
+      hash: entry.hash,
+      mtimeMs: entry.mtimeMs,
+      size: entry.size ?? null,
+    });
+    upsertFileEntry(relativePath, entry);
+  });
+};
+
 const emitHashUpdate = (entry) => {
   hashListeners.forEach((listener) => listener(entry));
 };
@@ -176,7 +204,7 @@ const queueThumbUpdate = (entry, previousHash) => {
   const nextPreviousHash = previousHash || existing?.previousHash;
   pendingThumbUpdates.set(entry.path, {
     ...entry,
-    previousHash: nextPreviousHash
+    previousHash: nextPreviousHash,
   });
   pendingThumbRemovals.delete(entry.path);
 };
@@ -202,7 +230,7 @@ export const setHashEntry = (relativePath, entry, options = {}) => {
   HASH_CACHE.set(relativePath, {
     hash: entry.hash,
     mtimeMs: entry.mtimeMs,
-    size: entry.size ?? null
+    size: entry.size ?? null,
   });
   upsertFileEntry(relativePath, entry);
   markDirty();
@@ -211,7 +239,7 @@ export const setHashEntry = (relativePath, entry, options = {}) => {
       path: relativePath,
       hash: entry.hash,
       mtimeMs: entry.mtimeMs,
-      size: entry.size ?? null
+      size: entry.size ?? null,
     });
   }
   if (options.persist !== false) {
@@ -232,25 +260,17 @@ export const removeHashEntry = (relativePath, options = {}) => {
 };
 
 export const loadHashCache = async () => {
-  ensureDirEntry('');
   await ensureCacheDir();
   let loaded = false;
   try {
     const contents = await fsPromises.readFile(HASH_CACHE_FILE, 'utf8');
     const data = JSON.parse(contents);
     const entries = data?.entries || {};
-    Object.entries(entries).forEach(([relativePath, entry]) => {
-      if (!entry?.hash || !Number.isFinite(entry.mtimeMs)) return;
-      HASH_CACHE.set(relativePath, {
-        hash: entry.hash,
-        mtimeMs: entry.mtimeMs,
-        size: entry.size ?? null
-      });
-      upsertFileEntry(relativePath, entry);
-    });
+    applyCacheEntries(entries);
     loaded = true;
   } catch (error) {
     if (error.code === 'ENOENT') {
+      applyCacheEntries({});
       loaded = true;
     } else {
       console.error('Failed to read hash cache', error);
@@ -258,6 +278,7 @@ export const loadHashCache = async () => {
   } finally {
     cacheLoaded = loaded;
   }
+  return loaded;
 };
 
 export const getHashEntry = (relativePath) => HASH_CACHE.get(relativePath) || null;
@@ -269,7 +290,7 @@ export const getHashEntries = () => {
       path: relativePath,
       hash: entry.hash,
       mtimeMs: entry.mtimeMs,
-      size: entry.size ?? null
+      size: entry.size ?? null,
     });
   }
   return entries;
@@ -303,7 +324,7 @@ export const getDirectoryTree = () => {
     const current = pending.pop();
     const entry = ENTRY_INDEX.get(current) || {
       name: current ? path.basename(current) : ROOT_NAME,
-      path: current
+      path: current,
     };
     const children = DIR_CHILDREN.get(current);
     const dirChildren = children
@@ -315,7 +336,7 @@ export const getDirectoryTree = () => {
     nodes[current] = {
       name: entry.name,
       path: current,
-      children: dirChildren
+      children: dirChildren,
     };
     dirChildren.forEach((childPath) => pending.push(childPath));
   }
@@ -338,8 +359,7 @@ export const startHashCacheWorker = async () => {
   if (cacheWorker) return;
   await ensureCacheDir();
   try {
-    const shouldShareInitialEntries =
-      cacheLoaded && HASH_CACHE.size <= MAX_WORKER_CACHE_ENTRIES;
+    const shouldShareInitialEntries = cacheLoaded && HASH_CACHE.size <= MAX_WORKER_CACHE_ENTRIES;
     const serialized = shouldShareInitialEntries ? serializeCache() : null;
     cacheWorker = new Worker(new URL('../worker/hash-cache-worker.js', import.meta.url), {
       workerData: {
@@ -348,8 +368,8 @@ export const startHashCacheWorker = async () => {
         excludePatterns: EXCLUDE_PATTERNS,
         scanIntervalMs: HASH_CACHE_SCAN_INTERVAL_MS,
         initialEntries: serialized ? serialized.entries : null,
-        initialEntriesLoaded: shouldShareInitialEntries
-      }
+        initialEntriesLoaded: shouldShareInitialEntries,
+      },
     });
     cacheWorker.on('message', (message) => {
       if (!message) return;
@@ -391,11 +411,13 @@ export const startHashCacheWorker = async () => {
         cacheStatus.lastScanUpdates = message.updatedCount || 0;
         cacheStatus.lastScanRemovals = message.removedCount || 0;
         const { updates, removals } = flushThumbQueue();
-        scanListeners.forEach((listener) => listener({
-          status: cacheStatus,
-          updates,
-          removals
-        }));
+        scanListeners.forEach((listener) =>
+          listener({
+            status: cacheStatus,
+            updates,
+            removals,
+          })
+        );
         if (isDirty()) {
           scheduleFlush();
         }
@@ -419,6 +441,39 @@ export const startHashCacheWorker = async () => {
   }
 };
 
+const scheduleCacheReload = () => {
+  if (cacheWatchTimer) {
+    clearTimeout(cacheWatchTimer);
+  }
+  cacheWatchTimer = setTimeout(() => {
+    cacheWatchTimer = null;
+    void loadHashCache();
+  }, CACHE_WATCH_DEBOUNCE_MS);
+};
+
+export const startHashCacheFileWatcher = async () => {
+  if (cacheFileWatcher) return;
+  await ensureCacheDir();
+  try {
+    const watchDir = path.dirname(HASH_CACHE_FILE);
+    cacheFileWatcher = fs.watch(watchDir, (_event, filename) => {
+      if (!filename) {
+        scheduleCacheReload();
+        return;
+      }
+      const name = filename.toString();
+      if (name === path.basename(HASH_CACHE_FILE) || name.endsWith('.tmp')) {
+        scheduleCacheReload();
+      }
+    });
+    cacheFileWatcher.on('error', (error) => {
+      console.error('Hash cache file watcher error', error);
+    });
+  } catch (error) {
+    console.error('Failed to watch hash cache file', error);
+  }
+};
+
 export const getHashCacheStatus = () => ({
   entries: HASH_CACHE.size,
   workerRunning: Boolean(cacheWorker),
@@ -427,6 +482,6 @@ export const getHashCacheStatus = () => ({
     finishedAt: cacheStatus.lastScanEnd ? new Date(cacheStatus.lastScanEnd).toISOString() : null,
     durationMs: cacheStatus.lastScanDurationMs,
     updates: cacheStatus.lastScanUpdates,
-    removals: cacheStatus.lastScanRemovals
-  }
+    removals: cacheStatus.lastScanRemovals,
+  },
 });

@@ -14,6 +14,12 @@ Web-based file browser and media viewer inspired by h5ai. The Node backend serve
 - `server/` Node API for directory listing and file streaming
 - `client/` React UI (Vite)
 
+## Modes
+
+- `server`: HTTP API + watches `file-hashes.json` for updates.
+- `worker`: hash-cache and thumbnail workers only.
+- `combined`: server + workers (default for `npm run dev` and Docker).
+
 ## Setup
 
 1. Point the backend at your archive directory:
@@ -30,6 +36,15 @@ export CACHE_ROOT="/absolute/path/to/cache"
 cd server
 npm install
 npm run dev
+```
+
+`npm run dev` starts `combined` mode. To run a single mode locally:
+
+```bash
+cd server
+npm start              # server mode
+node index.js worker   # worker mode
+node index.js combined # combined mode
 ```
 
 3. Install and run the frontend:
@@ -58,10 +73,11 @@ NODE_ENV=production npm start
 ```
 
 The server will serve the static client from `client/dist`. You can override this with `CLIENT_DIST=/path/to/dist`.
+To run workers in the same process for a single-container setup, use `node index.js combined`.
 
 ## Docker
 
-Build the image and run it with your archive mounted:
+Build the image and run it with your archive mounted (defaults to `combined` mode):
 
 ```bash
 docker build -t mediaview .
@@ -75,6 +91,30 @@ docker run --rm -p 3001:3001 \
 ```
 
 The image includes `ffmpeg` for video thumbnail generation.
+
+### Worker sidecar
+
+You can run the hash-cache and thumbnail workers in a separate container. The main
+server watches the shared `file-hashes.json` for changes.
+
+```bash
+docker run --rm -p 3001:3001 \
+  -e ARCHIVE_ROOT=/archive \
+  -e CACHE_ROOT=/cache \
+  -e ARCHIVE_NAME="My Archive" \
+  -v /absolute/path/to/archive:/archive:ro \
+  -v /absolute/path/to/cache:/cache:rw \
+  mediaview server
+
+docker run --rm \
+  -e ARCHIVE_ROOT=/archive \
+  -e CACHE_ROOT=/cache \
+  -v /absolute/path/to/archive:/archive:ro \
+  -v /absolute/path/to/cache:/cache:rw \
+  mediaview worker
+```
+
+Use `server` or `worker` to override the default `combined` mode.
 
 ## API
 

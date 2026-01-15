@@ -11,7 +11,7 @@ const {
   excludePatterns,
   scanIntervalMs,
   initialEntries,
-  initialEntriesLoaded
+  initialEntriesLoaded,
 } = workerData;
 const BATCH_SIZE = 200;
 const SCAN_INTERVAL_MS = Number(scanIntervalMs) > 0 ? Number(scanIntervalMs) : 60 * 1000;
@@ -31,12 +31,11 @@ let currentFilePath = '';
 const cache = new Map();
 
 const toPosix = (value) => value.split(path.sep).join('/');
-const cacheRelativePath = cacheFile
-  ? toPosix(path.relative(rootDir, cacheFile))
-  : null;
-const cacheRelativeDir = cacheRelativePath && !cacheRelativePath.startsWith('..')
-  ? path.posix.dirname(cacheRelativePath)
-  : null;
+const cacheRelativePath = cacheFile ? toPosix(path.relative(rootDir, cacheFile)) : null;
+const cacheRelativeDir =
+  cacheRelativePath && !cacheRelativePath.startsWith('..')
+    ? path.posix.dirname(cacheRelativePath)
+    : null;
 
 const isExcludedPath = (relativePath) => {
   if (!relativePath) return false;
@@ -77,7 +76,7 @@ const applyCacheEntries = (entries) => {
       hash: entry.hash,
       mtimeMs: entry.mtimeMs,
       size: entry.size ?? null,
-      lastSeenScanId: 0
+      lastSeenScanId: 0,
     });
   });
 };
@@ -113,7 +112,10 @@ const scanTree = async (currentScanId) => {
   const flushDirUpdates = () => {
     if (dirUpdates.length === 0) return;
     dirUpdateCount += dirUpdates.length;
-    parentPort?.postMessage({ type: 'dir-update', entries: dirUpdates.splice(0, dirUpdates.length) });
+    parentPort?.postMessage({
+      type: 'dir-update',
+      entries: dirUpdates.splice(0, dirUpdates.length),
+    });
   };
 
   const ensureDir = (relativePath) => {
@@ -173,7 +175,7 @@ const scanTree = async (currentScanId) => {
             hash,
             mtimeMs: stats.mtimeMs,
             size: stats.size,
-            lastSeenScanId: currentScanId
+            lastSeenScanId: currentScanId,
           });
           updates.push({ path: relativePath, hash, mtimeMs: stats.mtimeMs, size: stats.size });
           if (updates.length >= BATCH_SIZE) {
@@ -217,7 +219,7 @@ const scanTree = async (currentScanId) => {
     fileUpdatedCount: fileUpdateCount,
     fileRemovedCount: fileRemovals.length,
     dirUpdatedCount: dirUpdateCount,
-    dirRemovedCount: dirRemovals.length
+    dirRemovedCount: dirRemovals.length,
   };
 };
 
@@ -300,9 +302,7 @@ const runScan = async () => {
   if (!progressTimer) {
     progressTimer = setInterval(() => {
       const currentLabel = currentFilePath || 'pending';
-      console.log(
-        `Scan progress: ${processedFileCount} files processed, current ${currentLabel}`
-      );
+      console.log(`Scan progress: ${processedFileCount} files processed, current ${currentLabel}`);
     }, 10 * 1000);
   }
   const currentScanId = scanId + 1;
@@ -321,7 +321,7 @@ const runScan = async () => {
     startedAt,
     finishedAt,
     updatedCount: result.updatedCount,
-    removedCount: result.removedCount
+    removedCount: result.removedCount,
   });
   const changedFiles = (result.fileUpdatedCount || 0) + (result.fileRemovedCount || 0);
   const changedDirs = (result.dirUpdatedCount || 0) + (result.dirRemovedCount || 0);
@@ -360,7 +360,7 @@ parentPort?.on('message', (message) => {
       hash: message.entry.hash,
       mtimeMs: message.entry.mtimeMs,
       size: message.entry.size ?? null,
-      lastSeenScanId: existing?.lastSeenScanId ?? scanId
+      lastSeenScanId: existing?.lastSeenScanId ?? scanId,
     });
   }
   if (message.type === 'hash-remove' && Array.isArray(message.paths)) {

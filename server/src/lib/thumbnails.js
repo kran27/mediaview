@@ -3,13 +3,7 @@ import fsPromises from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { Worker } from 'node:worker_threads';
-import {
-  EXCLUDE_PATTERNS,
-  ROOT_DIR,
-  THUMB_DIR,
-  THUMB_EXT,
-  THUMB_SIZES
-} from '../config.js';
+import { EXCLUDE_PATTERNS, ROOT_DIR, THUMB_DIR, THUMB_EXT, THUMB_SIZES } from '../config.js';
 import { isThumbablePath } from './classify.js';
 import { getHashEntries, getHashEntry, onHashScanComplete } from './hash-cache.js';
 
@@ -48,7 +42,7 @@ export const enqueueThumbnailJobs = (paths) => {
       path: relativePath,
       hash: cached.hash,
       mtimeMs: cached.mtimeMs,
-      size: cached.size ?? null
+      size: cached.size ?? null,
     });
   });
   if (entries.length === 0) return;
@@ -111,7 +105,7 @@ const getWorkerIndex = (pathValue) => {
   if (!thumbnailWorkers.length) return 0;
   let hash = 0;
   for (let index = 0; index < pathValue.length; index += 1) {
-    hash = ((hash << 5) - hash) + pathValue.charCodeAt(index);
+    hash = (hash << 5) - hash + pathValue.charCodeAt(index);
     hash |= 0;
   }
   return Math.abs(hash) % thumbnailWorkers.length;
@@ -140,7 +134,7 @@ const dispatchSync = (updates, removals) => {
     worker.postMessage({
       type: 'sync',
       entries: payload.updates,
-      removals: payload.removals
+      removals: payload.removals,
     });
   });
 };
@@ -156,8 +150,8 @@ export const startThumbnailWorker = async () => {
           thumbDir: THUMB_DIR,
           excludePatterns: EXCLUDE_PATTERNS,
           sizes: THUMB_SIZES,
-          thumbExt: THUMB_EXT
-        }
+          thumbExt: THUMB_EXT,
+        },
       });
       worker.on('error', (error) => {
         console.error(`Thumbnail worker ${index + 1} error`, error);

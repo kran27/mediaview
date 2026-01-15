@@ -17,15 +17,15 @@ export const THUMB_EXT = '.avif';
 export const THUMB_SIZES = {
   sm: 200,
   md: 400,
-  lg: 600
+  lg: 600,
 };
 export const HASH_CACHE_SCAN_INTERVAL_MS = Number(process.env.HASH_CACHE_SCAN_INTERVAL_MS) || 60000;
-const DEFAULT_EXCLUDE_PATTERNS = ['.DS_Store', '_h5ai'];
+const DEFAULT_EXCLUDE_PATTERNS = ['.DS_Store', '_h5ai', 'unlisted_'];
 
 export const EXCLUDE_PATTERNS = [
   ...DEFAULT_EXCLUDE_PATTERNS,
   ...(process.env.EXCLUDE_PATTERNS || '')
     .split(',')
     .map((pattern) => pattern.trim())
-    .filter(Boolean)
+    .filter(Boolean),
 ];

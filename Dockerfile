@@ -7,7 +7,7 @@ RUN npm run build
 
 FROM node:25-alpine AS server
 WORKDIR /app/server
-RUN apk add --no-cache tini ffmpeg
+RUN apk add --no-cache tini ffmpeg vips
 COPY server/package.json server/package-lock.json ./
 RUN npm ci --omit=dev
 COPY server/ ./
@@ -17,5 +17,5 @@ ENV CLIENT_DIST=/app/client/dist
 ENV ARCHIVE_ROOT=/archive
 ENV CACHE_ROOT=/cache
 EXPOSE 3001
-ENTRYPOINT ["tini", "--"]
-CMD ["node", "index.js"]
+ENTRYPOINT ["tini", "--", "node", "index.js"]
+CMD ["combined"]

@@ -27,7 +27,7 @@ export const createApp = () => {
         const type = res.getHeader('Content-Type');
         if (typeof type === 'string' && type.startsWith('video/')) return false;
         return compression.filter(req, res);
-      }
+      },
     })
   );
 
@@ -35,7 +35,7 @@ export const createApp = () => {
     app.use(
       helmet({
         crossOriginResourcePolicy: { policy: 'cross-origin' },
-        contentSecurityPolicy: false
+        contentSecurityPolicy: false,
       })
     );
   }

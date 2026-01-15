@@ -94,6 +94,7 @@
 
 .list-thumb-stack .list-thumb.thumb-failed {
   opacity: 0;
+  visibility: hidden;
 }
 
 .list-thumb-icon {
@@ -251,6 +252,7 @@
 
 .thumb-stack img.thumb-failed {
   opacity: 0;
+  visibility: hidden;
 }
 
 .thumb-stack .thumb-icon {

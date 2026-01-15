@@ -1,6 +1,19 @@
 import path from 'node:path';
 
-export const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.avif']);
+export const IMAGE_EXTS = new Set([
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.gif',
+  '.webp',
+  '.bmp',
+  '.svg',
+  '.avif',
+  '.tiff',
+  '.tif',
+  '.heic',
+  '.ico',
+]);
 export const VIDEO_EXTS = new Set([
   '.mp4',
   '.m4v',
@@ -25,7 +38,7 @@ export const VIDEO_EXTS = new Set([
   '.asf',
   '.mxf',
   '.m1v',
-  '.m2v'
+  '.m2v',
 ]);
 export const THUMB_VIDEO_EXTS = new Set(VIDEO_EXTS);
 export const ARCHIVE_EXTS = new Set([
@@ -52,10 +65,31 @@ export const ARCHIVE_EXTS = new Set([
   '.war',
   '.ear',
   '.apk',
-  '.ipa'
+  '.ipa',
 ]);
-export const AUDIO_EXTS = new Set(['.mp3', '.m4a', '.aac', '.wav', '.flac', '.ogg']);
-export const DOC_EXTS = new Set(['.pdf']);
+export const AUDIO_EXTS = new Set([
+  '.mp3',
+  '.m4a',
+  '.aac',
+  '.wav',
+  '.flac',
+  '.ogg',
+  '.wma',
+  '.alac',
+  '.aiff',
+]);
+export const DOC_EXTS = new Set([
+  '.pdf',
+  '.doc',
+  '.docx',
+  '.xls',
+  '.xlsx',
+  '.ppt',
+  '.pptx',
+  '.odt',
+  '.ods',
+  '.odp',
+]);
 export const TEXT_EXTS = new Set(['.txt', '.md', '.json', '.csv', '.log']);
 
 export const classifyFile = (ext) => {

@@ -34,7 +34,6 @@ const renderThumbStack = ({
       src={buildThumbUrl(entry.path, 'sm')}
       srcSet={buildThumbSrcSet(entry.path)}
       sizes={sizes}
-      alt={entry.name}
       loading="lazy"
       onLoad={handleThumbLoad}
       onError={handleThumbError}

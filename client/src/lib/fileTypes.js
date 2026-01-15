@@ -1,3 +1,17 @@
+const IMAGE_EXTS = new Set([
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.gif',
+  '.webp',
+  '.bmp',
+  '.svg',
+  '.avif',
+  '.tiff',
+  '.tif',
+  '.heic',
+  '.ico'
+]);
 const VIDEO_EXTS = new Set([
   '.mp4',
   '.m4v',
@@ -23,6 +37,17 @@ const VIDEO_EXTS = new Set([
   '.mxf',
   '.m1v',
   '.m2v'
+]);
+const AUDIO_EXTS = new Set([
+  '.mp3',
+  '.m4a',
+  '.aac',
+  '.wav',
+  '.flac',
+  '.ogg',
+  '.wma',
+  '.alac',
+  '.aiff'
 ]);
 const ARCHIVE_EXTS = new Set([
   '.zip',
@@ -50,6 +75,19 @@ const ARCHIVE_EXTS = new Set([
   '.apk',
   '.ipa'
 ]);
+const DOC_EXTS = new Set([
+  '.pdf',
+  '.doc',
+  '.docx',
+  '.xls',
+  '.xlsx',
+  '.ppt',
+  '.pptx',
+  '.odt',
+  '.ods',
+  '.odp'
+]);
+const TEXT_EXTS = new Set(['.txt', '.md', '.json', '.csv', '.log']);
 
 export const VIEWABLE_TYPES = new Set(['image', 'video', 'audio', 'document', 'text']);
 
@@ -67,6 +105,34 @@ export const isVideoEntry = (entry) => {
   return VIDEO_EXTS.has(ext);
 };
 
+export const isAudioEntry = (entry) => {
+  if (!entry || entry.isDir) return false;
+  if (entry.type === 'audio') return true;
+  const ext = getEntryExtension(entry);
+  return AUDIO_EXTS.has(ext);
+};
+
+export const isImageEntry = (entry) => {
+  if (!entry || entry.isDir) return false;
+  if (entry.type === 'image') return true;
+  const ext = getEntryExtension(entry);
+  return IMAGE_EXTS.has(ext);
+};
+
+export const isDocumentEntry = (entry) => {
+  if (!entry || entry.isDir) return false;
+  if (entry.type === 'document') return true;
+  const ext = getEntryExtension(entry);
+  return DOC_EXTS.has(ext);
+};
+
+export const isTextEntry = (entry) => {
+  if (!entry || entry.isDir) return false;
+  if (entry.type === 'text') return true;
+  const ext = getEntryExtension(entry);
+  return TEXT_EXTS.has(ext);
+};
+
 export const isArchiveEntry = (entry) => {
   if (!entry || entry.isDir) return false;
   if (entry.type === 'archive') return true;
@@ -75,15 +141,26 @@ export const isArchiveEntry = (entry) => {
 };
 
 export const isViewableEntry = (entry) =>
-  Boolean(entry && !entry.isDir && (VIEWABLE_TYPES.has(entry.type) || isVideoEntry(entry)));
+  Boolean(
+    entry
+    && !entry.isDir
+    && (VIEWABLE_TYPES.has(entry.type)
+      || isImageEntry(entry)
+      || isVideoEntry(entry)
+      || isAudioEntry(entry)
+      || isDocumentEntry(entry)
+      || isTextEntry(entry))
+  );
 
 export const fileTypeLabel = (entry) => {
   if (entry.isDir) return 'Folder';
+  if (isImageEntry(entry)) return 'Image';
   if (isVideoEntry(entry)) return 'Video';
+  if (isAudioEntry(entry)) return 'Audio';
   if (isArchiveEntry(entry)) return 'Archive';
+  if (isDocumentEntry(entry)) return 'Document';
+  if (isTextEntry(entry)) return 'Text';
   switch (entry.type) {
-    case 'image':
-      return 'Image';
     case 'audio':
       return 'Audio';
     case 'document':

@@ -22,8 +22,7 @@ let queueProcessedCount = 0;
 let queueCreatedCount = 0;
 let queueCurrentPath = '';
 
-const getThumbHeight = (width) =>
-  Math.round((width * THUMB_ASPECT.height) / THUMB_ASPECT.width);
+const getThumbHeight = (width) => Math.round((width * THUMB_ASPECT.height) / THUMB_ASPECT.width);
 
 const toPosix = (value) => value.split(path.sep).join('/');
 
@@ -69,7 +68,8 @@ const deleteThumbFiles = async (relativePath, hash) => {
     sizeEntries.map(([variant]) => {
       const thumbName = `${hash}-${variant}-${originalName}${thumbExt}`;
       const thumbPath = path.join(thumbDir, thumbName);
-      return fsPromises.unlink(thumbPath)
+      return fsPromises
+        .unlink(thumbPath)
         .then(() => {
           deletedCount += 1;
         })
@@ -85,13 +85,18 @@ const deleteThumbFiles = async (relativePath, hash) => {
 const enqueueEntries = (entries) => {
   entries.forEach((entry) => {
     const relativePath = entry?.path;
-    if (!relativePath || !entry?.hash || pending.has(relativePath) || isExcludedPath(relativePath)) {
+    if (
+      !relativePath ||
+      !entry?.hash ||
+      pending.has(relativePath) ||
+      isExcludedPath(relativePath)
+    ) {
       return;
     }
     hashCache.set(relativePath, {
       hash: entry.hash,
       mtimeMs: entry.mtimeMs,
-      size: entry.size ?? null
+      size: entry.size ?? null,
     });
     pending.add(relativePath);
     queue.push(relativePath);
@@ -144,9 +149,9 @@ const generateThumbnails = async (relativePath, hash, options = {}) => {
   const variants = options.force
     ? sizeEntries
     : sizeEntries.filter(([variant]) => {
-      const thumbName = `${cachedHash}-${variant}-${originalName}${thumbExt}`;
-      return !fs.existsSync(path.join(thumbDir, thumbName));
-    });
+        const thumbName = `${cachedHash}-${variant}-${originalName}${thumbExt}`;
+        return !fs.existsSync(path.join(thumbDir, thumbName));
+      });
   if (variants.length === 0) {
     return { hash: cachedHash, created: 0 };
   }
@@ -189,7 +194,7 @@ const getVideoDurationSeconds = (absolutePath) => {
     'format=duration',
     '-of',
     'default=noprint_wrappers=1:nokey=1',
-    absolutePath
+    absolutePath,
   ]);
   if (result.status !== 0) return null;
   const output = String(result.stdout || '').trim();
@@ -214,7 +219,7 @@ const extractVideoFrame = (absolutePath) =>
       'image2pipe',
       '-vcodec',
       'png',
-      'pipe:1'
+      'pipe:1',
     ]);
     process.stdout.on('data', (chunk) => chunks.push(chunk));
     process.stdout.on('error', reject);
@@ -243,9 +248,9 @@ const generateVideoThumbnails = async (relativePath, hash, options = {}) => {
   const variants = options.force
     ? sizeEntries
     : sizeEntries.filter(([variant]) => {
-      const thumbName = `${cachedHash}-${variant}-${originalName}${thumbExt}`;
-      return !fs.existsSync(path.join(thumbDir, thumbName));
-    });
+        const thumbName = `${cachedHash}-${variant}-${originalName}${thumbExt}`;
+        return !fs.existsSync(path.join(thumbDir, thumbName));
+      });
   if (variants.length === 0) {
     return { hash: cachedHash, created: 0 };
   }
@@ -342,10 +347,14 @@ parentPort?.on('message', (message) => {
     hashCache.set(message.entry.path, {
       hash: message.entry.hash,
       mtimeMs: message.entry.mtimeMs,
-      size: message.entry.size ?? null
+      size: message.entry.size ?? null,
     });
   }
-  if (message.type === 'sync' && Array.isArray(message.entries) && Array.isArray(message.removals)) {
+  if (
+    message.type === 'sync' &&
+    Array.isArray(message.entries) &&
+    Array.isArray(message.removals)
+  ) {
     const updates = message.entries;
     const removals = message.removals;
     void (async () => {
@@ -364,14 +373,14 @@ parentPort?.on('message', (message) => {
           hashCache.set(entry.path, {
             hash: entry.hash,
             mtimeMs: entry.mtimeMs,
-            size: entry.size ?? null
+            size: entry.size ?? null,
           });
           const ext = path.extname(entry.path).toLowerCase();
-        if (IMAGE_EXTS.has(ext) || THUMB_VIDEO_EXTS.has(ext)) {
-          const force = !previousHash || previousHash !== entry.hash;
-          if (THUMB_VIDEO_EXTS.has(ext)) {
-            const result = await generateVideoThumbnails(entry.path, entry.hash, { force });
-            createdCount += result?.created || 0;
+          if (IMAGE_EXTS.has(ext) || THUMB_VIDEO_EXTS.has(ext)) {
+            const force = !previousHash || previousHash !== entry.hash;
+            if (THUMB_VIDEO_EXTS.has(ext)) {
+              const result = await generateVideoThumbnails(entry.path, entry.hash, { force });
+              createdCount += result?.created || 0;
             } else {
               const result = await generateThumbnails(entry.path, entry.hash, { force });
               createdCount += result?.created || 0;

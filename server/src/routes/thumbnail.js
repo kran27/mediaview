@@ -11,10 +11,13 @@ import { getHashEntry, hasHashEntry } from '../lib/hash-cache.js';
 import { getThumbPath } from '../lib/thumbnails.js';
 
 const parseThumbnailRequest = (req) => {
-  if (typeof req.params.size === 'string' && (typeof req.params.path === 'string' || Array.isArray(req.params.path))) {
+  if (
+    typeof req.params.size === 'string' &&
+    (typeof req.params.path === 'string' || Array.isArray(req.params.path))
+  ) {
     return {
       requestPath: decodePathSegments(req.params.path),
-      size: req.params.size
+      size: req.params.size,
     };
   }
   if (typeof req.params.path === 'string' || Array.isArray(req.params.path)) {
@@ -24,7 +27,9 @@ const parseThumbnailRequest = (req) => {
     if (leading && THUMB_SIZES[leading]) {
       return { requestPath: segments.slice(1).join('/'), size: leading };
     }
-    const trailing = segments[segments.length - 1] ? segments[segments.length - 1].toLowerCase() : '';
+    const trailing = segments[segments.length - 1]
+      ? segments[segments.length - 1].toLowerCase()
+      : '';
     if (trailing && THUMB_SIZES[trailing]) {
       return { requestPath: segments.slice(0, -1).join('/'), size: trailing };
     }
@@ -101,7 +106,7 @@ export const registerThumbnailRoute = (app) => {
       }
       res.writeHead(200, {
         'Content-Type': mimeType,
-        'Cache-Control': cacheControl
+        'Cache-Control': cacheControl,
       });
       fs.createReadStream(thumbPath).pipe(res);
     } catch (error) {

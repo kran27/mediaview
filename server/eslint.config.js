@@ -3,21 +3,21 @@ import globals from 'globals';
 
 export default [
   {
-    ignores: ['node_modules/**']
+    ignores: ['node_modules/**'],
   },
   js.configs.recommended,
   {
     files: ['**/*.js'],
     linterOptions: {
-      reportUnusedDisableDirectives: 'warn'
+      reportUnusedDisableDirectives: 'warn',
     },
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
       globals: {
         ...globals.node,
-        ...globals.es2021
-      }
-    }
-  }
+        ...globals.es2021,
+      },
+    },
+  },
 ];

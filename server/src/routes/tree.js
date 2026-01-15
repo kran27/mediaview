@@ -7,7 +7,7 @@ export const registerTreeRoute = (app) => {
       const nodes = getDirectoryTree();
       res.json({
         root: { name: ROOT_NAME, path: '' },
-        nodes
+        nodes,
       });
     } catch (error) {
       res.status(500).json({ error: 'Failed to build tree', detail: error.message });

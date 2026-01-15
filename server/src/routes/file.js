@@ -57,7 +57,7 @@ export const handleFileRequest = async (req, res, rawPath) => {
         'Content-Length': 0,
         'Content-Type': mimeType,
         'Accept-Ranges': 'bytes',
-        'Cache-Control': cacheControl
+        'Cache-Control': cacheControl,
       });
       res.end();
       return;
@@ -88,7 +88,7 @@ export const handleFileRequest = async (req, res, rawPath) => {
         'Accept-Ranges': 'bytes',
         'Content-Length': chunkSize,
         'Content-Type': mimeType,
-        'Cache-Control': cacheControl
+        'Cache-Control': cacheControl,
       });
       fs.createReadStream(absolutePath, { start: clampedStart, end: clampedEnd }).pipe(res);
       return;
@@ -98,7 +98,7 @@ export const handleFileRequest = async (req, res, rawPath) => {
       'Content-Length': stats.size,
       'Content-Type': mimeType,
       'Accept-Ranges': 'bytes',
-      'Cache-Control': cacheControl
+      'Cache-Control': cacheControl,
     });
     fs.createReadStream(absolutePath).pipe(res);
   } catch (error) {
