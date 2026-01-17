@@ -1,3 +1,5 @@
+import { IconWifiOff } from './index.js';
+
 const ConnectionLightbox = ({ open, onRetry, rootLabel }) => {
   if (!open) return null;
   const label = rootLabel || 'the archive';
@@ -5,7 +7,7 @@ const ConnectionLightbox = ({ open, onRetry, rootLabel }) => {
     <div className="connection-lightbox" role="alertdialog" aria-modal="true">
       <div className="connection-lightbox-card">
         <div className="connection-lightbox-icon" aria-hidden="true">
-          <i className="bi bi-wifi-off" aria-hidden="true" />
+          <IconWifiOff />
         </div>
         <div className="connection-lightbox-title">Connection error</div>
         <div className="connection-lightbox-copy">

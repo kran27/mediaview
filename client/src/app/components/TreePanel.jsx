@@ -1,5 +1,5 @@
 import './TreePanel.css';
-import { IconDatabase, IconFolder } from './index.js';
+import { IconChevronRight, IconCollapse, IconDatabase, IconFolder } from './index.js';
 
 const TreeNode = ({ node, tree, currentPath, onToggle, onNavigate, isRoot = false, rootLabel }) => {
   const isLoaded = Array.isArray(node.children);
@@ -17,7 +17,9 @@ const TreeNode = ({ node, tree, currentPath, onToggle, onNavigate, isRoot = fals
             onClick={() => onToggle(node.path)}
             aria-label={node.expanded ? 'Collapse' : 'Expand'}
           >
-            <i className="bi bi-chevron-right tree-toggle-icon" aria-hidden="true" />
+            <span className="tree-toggle-icon" aria-hidden="true">
+              <IconChevronRight />
+            </span>
           </button>
         ) : isRoot ? null : (
           <span className="tree-toggle placeholder" aria-hidden="true" />
@@ -83,7 +85,7 @@ const TreePanel = ({
             aria-label="Collapse all folders"
             title="Collapse all folders"
           >
-            <i className="bi bi-arrows-collapse icon" aria-hidden="true" />
+            <IconCollapse />
           </button>
         )}
       </div>

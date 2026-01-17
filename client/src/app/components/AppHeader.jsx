@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { ViewToggle } from './index.js';
+import { IconClose, IconSearch, ViewToggle } from './index.js';
 
 const AppHeader = forwardRef(({
   onNavigateRoot,
@@ -98,13 +98,13 @@ const AppHeader = forwardRef(({
         <form className="search" onSubmit={handleSearchSubmit}>
           <button type="button" className="search-toggle" onClick={handleSearchOpen}>
             <span className="search-icon" aria-hidden="true">
-              <i className="bi bi-search icon" aria-hidden="true" />
+              <IconSearch />
             </span>
             <span className="search-label-full">Search the archive</span>
             <span className="search-label-short">Search</span>
           </button>
           <span className="search-icon desktop" aria-hidden="true">
-            <i className="bi bi-search icon" aria-hidden="true" />
+            <IconSearch />
           </span>
           <input
             ref={inputRef}
@@ -127,7 +127,7 @@ const AppHeader = forwardRef(({
             aria-label="Close search results"
             title="Close search results"
           >
-            <i className="bi bi-x-lg icon" aria-hidden="true" />
+            <IconClose />
           </button>
         </form>
         <ViewToggle
