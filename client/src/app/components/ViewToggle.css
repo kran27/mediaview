@@ -23,7 +23,7 @@
 }
 
 .view-segment.active {
-  background: rgba(123, 31, 31, 0.08);
+  background: transparent;
 }
 
 .view-button {
@@ -87,7 +87,7 @@
 }
 
 .size-toggle button.active {
-  background: rgba(123, 31, 31, 0.14);
+  background: transparent;
   color: var(--accent);
 }
 

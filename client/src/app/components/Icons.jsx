@@ -1,4 +1,4 @@
-import './Icons.css';
+import '../../styles/components/icons.css';
 import { isArchiveEntry } from '../../lib/fileTypes.js';
 
 export const IconFolder = () => <i className="bi bi-folder2 icon" aria-hidden="true" />;

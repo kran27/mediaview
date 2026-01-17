@@ -7,7 +7,7 @@ RUN npm run build
 
 FROM node:25-alpine AS server
 WORKDIR /app/server
-RUN apk add --no-cache tini ffmpeg vips
+RUN apk add --no-cache tini ffmpeg
 COPY server/package.json server/package-lock.json ./
 RUN npm ci --omit=dev
 COPY server/ ./

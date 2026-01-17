@@ -1,5 +1,5 @@
 import './ViewToggle.css';
-import { IconGrid, IconList } from './Icons.jsx';
+import { IconGrid, IconList } from './index.js';
 
 const ViewToggle = ({ viewMode, onChange, zoomLevel, onZoomChange }) => (
   <div

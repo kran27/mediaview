@@ -20,7 +20,7 @@
   letter-spacing: 0.08em;
   color: var(--muted);
   width: 100%;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  border-bottom: 1px solid var(--divider-subtle);
 }
 
 .list-row {
@@ -37,8 +37,8 @@
 
 .list-row:hover,
 .list-row.selected {
-  border-color: rgba(123, 31, 31, 0.25);
-  background: rgba(123, 31, 31, 0.04);
+  border-color: var(--accent-border-soft);
+  background: var(--accent-bg-soft);
 }
 
 .list-cell {
@@ -128,7 +128,7 @@
   width: auto;
   aspect-ratio: 1 / 1;
   border-radius: 12px;
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--soft-bg);
   display: grid;
   place-items: center;
   flex: 0 1 auto;
@@ -168,7 +168,7 @@
 }
 
 .grid-card {
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--card-bg);
   border-radius: var(--radius-md);
   padding: 12px;
   border: 1px solid transparent;
@@ -210,15 +210,15 @@
 
 .grid-card.selected,
 .grid-card:hover {
-  border-color: rgba(123, 31, 31, 0.35);
-  background: rgba(123, 31, 31, 0.06);
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
 }
 
 .thumb {
   width: 100%;
   aspect-ratio: var(--thumb-ratio);
   border-radius: 12px;
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--soft-bg);
   display: grid;
   place-items: center;
   overflow: hidden;

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import '../../styles/components/navigation.css';
 
-const Breadcrumbs = ({ path, onNavigate }) => {
+const Breadcrumbs = ({ path, onNavigate, searchQuery }) => {
   const scrollRef = useRef(null);
   const segments = path ? path.split('/') : [];
 
@@ -27,9 +27,10 @@ const Breadcrumbs = ({ path, onNavigate }) => {
       window.removeEventListener('resize', handleResize);
       node.removeEventListener('scroll', handleScroll);
     };
-  }, [path]);
+  }, [path, searchQuery]);
 
-  const isRootCurrent = !path;
+  const isSearchActive = Boolean(searchQuery);
+  const isRootCurrent = !path && !isSearchActive;
 
   return (
     <div className="breadcrumbs-scroll" ref={scrollRef}>
@@ -43,7 +44,15 @@ const Breadcrumbs = ({ path, onNavigate }) => {
           <i className="bi bi-house icon" aria-hidden="true" />
           <span className="crumb-label">Home</span>
         </button>
-        {segments.map((segment, index) => {
+        {isSearchActive && (
+          <span className="crumb-segment">
+            <span className="crumb-separator">/</span>
+            <span className="crumb current">
+              Search for &quot;{searchQuery}&quot;
+            </span>
+          </span>
+        )}
+        {!isSearchActive && segments.map((segment, index) => {
           const crumbPath = segments.slice(0, index + 1).join('/');
           const isCurrent = index === segments.length - 1;
           return (

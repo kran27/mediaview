@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { createApp } from './src/app.js';
 import { PORT, ROOT_DIR } from './src/config.js';
 import { startThumbnailWorker } from './src/lib/thumbnails.js';

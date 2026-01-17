@@ -7,15 +7,22 @@ export const readUrlState = () => {
         .map((segment) => decodeURIComponent(segment))
         .join('/')
     : '';
+  const isSearch = decodedPath === 'search';
+  const search = isSearch ? (params.get('q') || '') : '';
   const preview = params.get('preview') || params.get('item') || '';
   return {
-    path: decodedPath,
-    preview
+    path: isSearch ? '' : decodedPath,
+    preview: isSearch ? '' : preview,
+    search
   };
 };
 
 export const buildUrlState = (state) => {
   const params = new URLSearchParams();
+  if (state.search) {
+    params.set('q', state.search);
+    return `/search${params.toString() ? `?${params.toString()}` : ''}`;
+  }
   if (state.preview) params.set('preview', state.preview);
   const query = params.toString();
   const pathname = state.path

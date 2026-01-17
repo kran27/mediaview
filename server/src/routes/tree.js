@@ -10,7 +10,8 @@ export const registerTreeRoute = (app) => {
         nodes,
       });
     } catch (error) {
-      res.status(500).json({ error: 'Failed to build tree', detail: error.message });
+      console.error('Tree request failed', error);
+      res.status(500).json({ error: 'Failed to build tree' });
     }
   });
 };

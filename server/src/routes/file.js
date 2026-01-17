@@ -102,6 +102,7 @@ export const handleFileRequest = async (req, res, rawPath) => {
     });
     fs.createReadStream(absolutePath).pipe(res);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to stream file', detail: error.message });
+    console.error('File request failed', error);
+    res.status(500).json({ error: 'Failed to stream file' });
   }
 };

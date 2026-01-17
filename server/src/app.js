@@ -7,6 +7,7 @@ import { handleFileRequest } from './routes/file.js';
 import { registerHashCacheRoute } from './routes/hash-cache.js';
 import { registerHealthRoute } from './routes/health.js';
 import { registerListRoute } from './routes/list.js';
+import { registerSearchRoute } from './routes/search.js';
 import { registerTreeRoute } from './routes/tree.js';
 import { registerThumbnailRoute } from './routes/thumbnail.js';
 import { isExcludedPath } from './lib/exclude.js';
@@ -51,6 +52,7 @@ export const createApp = () => {
   registerHealthRoute(app);
   registerHashCacheRoute(app);
   registerListRoute(app);
+  registerSearchRoute(app);
   registerTreeRoute(app);
   registerThumbnailRoute(app);
 

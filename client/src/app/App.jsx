@@ -1,19 +1,25 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import '../styles/components/layout.css';
 import '../styles/components/lightbox.css';
 import '../styles/components/navigation.css';
 import '../styles/components/header.css';
 import '../styles/components/footer.css';
 import '../styles/components/animations.css';
-import { Breadcrumbs, TreePanel } from './components/index.js';
-import { isViewableEntry } from '../lib/fileTypes.js';
+import {
+  AppFooter,
+  AppHeader,
+  Breadcrumbs,
+  ConnectionLightbox,
+  DirectoryPanel,
+  Lightbox,
+  TreePanel
+} from './components/index.js';
 import { getBasename } from '../lib/format.js';
 import { readUrlState, setUrlState } from '../lib/urlState.js';
 import { useDirectoryData } from './hooks/useDirectoryData.js';
-import AppFooter from './components/AppFooter.jsx';
-import AppHeader from './AppHeader.jsx';
-import DirectoryPanel from './DirectoryPanel.jsx';
-import Lightbox from './Lightbox.jsx';
+import { useLightboxState } from './hooks/useLightboxState.js';
+import { useResponsiveTree } from './hooks/useResponsiveTree.js';
+import { useUrlSync } from './hooks/useUrlSync.js';
 
 export default function App() {
   const {
@@ -21,10 +27,18 @@ export default function App() {
     currentPath,
     selected,
     setSelected,
+    pendingSelection,
     status,
     tree,
-    search,
-    setSearch,
+    treeStatus,
+    searchInput,
+    setSearchInput,
+    searchQuery,
+    submitSearch,
+    clearSearch,
+    searchResults,
+    searchStatus,
+    retrySearch,
     viewMode,
     setViewMode,
     zoomLevel,
@@ -36,36 +50,49 @@ export default function App() {
     loadDirectory,
     handleToggle,
     collapseAll,
-    lastGoodPath
+    lastGoodPath,
+    retryTree
   } = useDirectoryData();
+  const [lastBrowsePath, setLastBrowsePath] = useState('');
   const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [isTreeHidden, setIsTreeHidden] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return window.matchMedia('(max-width: 900px)').matches;
-  });
   const loadDirectoryRef = useRef(loadDirectory);
+  const hasSearchState = Boolean(searchQuery || searchInput.trim());
+  const isSearchMode = Boolean(searchQuery);
+  const searchStateRef = useRef({ searchQuery: '', searchInput: '' });
 
-  const rootLabel = "The Mirror's Edge Archive";
+  const rootLabel = 'Archive root';
   const currentPathName = currentPath ? getBasename(currentPath) : rootLabel;
-  const selectedEntry = selected && directory?.entries.find((entry) => entry.path === selected.path)
-    ? selected
-    : null;
-  const lightboxEntries = useMemo(() => {
-    if (!directory) return [];
-    return directory.entries.filter((entry) => !entry.isDir);
-  }, [directory]);
-  const activeLightboxIndex = useMemo(() => {
-    if (!selectedEntry) return -1;
-    return lightboxEntries.findIndex((entry) => entry.path === selectedEntry.path);
-  }, [lightboxEntries, selectedEntry]);
+  const pendingSelectionPath = pendingSelection || '';
+  const activeEntries = filteredEntries;
+  const isTreeHidden = useResponsiveTree(1100);
 
   useEffect(() => {
     loadDirectoryRef.current = loadDirectory;
   }, [loadDirectory]);
 
+  useEffect(() => {
+    searchStateRef.current = { searchQuery, searchInput };
+  }, [searchQuery, searchInput]);
+
+  useEffect(() => {
+    if (!searchQuery) return;
+    const urlState = readUrlState();
+    if (!urlState.search) {
+      clearSearch();
+    }
+  }, [clearSearch, searchQuery]);
+
   const navigateTo = useCallback(async (pathValue, options = {}) => {
-    const { selectPath = '', updateUrl = true, replaceUrl = false } = options;
-    const { selection, shouldLightbox } = await loadDirectoryRef.current(pathValue, { selectPath });
+    const {
+      selectPath = '',
+      updateUrl = true,
+      replaceUrl = false,
+      openLightbox = true
+    } = options;
+    const { selection, shouldLightbox } = await loadDirectoryRef.current(pathValue, {
+      selectPath,
+      openLightbox
+    });
     setLightboxOpen(shouldLightbox);
     if (updateUrl) {
       setUrlState(
@@ -76,128 +103,136 @@ export default function App() {
         { replace: replaceUrl }
       );
     }
-  }, []);
+  }, [setLightboxOpen]);
 
-  const handleOpen = (entry) => {
-    if (entry.isDir) {
-      void navigateTo(entry.path);
-    } else if (isViewableEntry(entry)) {
-      handleViewMedia(entry);
+  const handleNavigate = useCallback((pathValue, options = {}) => {
+    if (hasSearchState) {
+      clearSearch();
+    }
+    return navigateTo(pathValue, options);
+  }, [clearSearch, hasSearchState, navigateTo]);
+
+  const {
+    selectedEntry,
+    lightboxEntries,
+    activeLightboxIndex,
+    handleOpen,
+    handleClose,
+    handlePrev,
+    handleNext,
+    handleNavigateFromLightbox
+  } = useLightboxState({
+    entries: activeEntries,
+    currentPath,
+    isSearchMode,
+    selected,
+    setSelected,
+    onNavigate: handleNavigate,
+    lightboxOpen,
+    setLightboxOpen
+  });
+
+  const applySearch = useCallback((value) => {
+    const trimmed = value.trim();
+    if (trimmed) {
+      const fallbackPath = currentPath ?? lastGoodPath ?? '';
+      setLastBrowsePath(fallbackPath || '');
+    }
+    submitSearch(trimmed);
+    return trimmed;
+  }, [currentPath, lastGoodPath, submitSearch]);
+
+  const handleSearchSubmit = useCallback((value) => {
+    const trimmed = applySearch(value);
+    if (trimmed) {
+      setUrlState({ search: trimmed });
     } else {
-      setSelected(entry);
-      setLightboxOpen(true);
-      setUrlState(
-        { path: currentPath, preview: entry.name },
-        { replace: true }
-      );
+      setUrlState({ path: currentPath, preview: '' });
     }
-  };
+  }, [applySearch, currentPath]);
 
-  const handleViewMedia = (entry) => {
-    if (!isViewableEntry(entry)) return;
-    if (!selected || selected.path !== entry.path) {
-      setSelected(entry);
-    }
-    setLightboxOpen(true);
-    setUrlState(
-      { path: currentPath, preview: entry.name },
-      { replace: true }
-    );
-  };
 
-  const handleCloseLightbox = () => {
-    setLightboxOpen(false);
-    setUrlState(
-      { path: currentPath, preview: '' },
-      { replace: true }
-    );
-  };
+  const handleCloseSearch = useCallback(() => {
+    const returnPath = lastBrowsePath ?? '';
+    clearSearch();
+    void navigateTo(returnPath);
+  }, [clearSearch, navigateTo, lastBrowsePath]);
 
-  const openLightboxByIndex = (index) => {
-    if (index < 0 || index >= lightboxEntries.length) return;
-    const entry = lightboxEntries[index];
-    if (!entry) return;
-    setSelected(entry);
-    setLightboxOpen(true);
-    setUrlState(
-      { path: currentPath, preview: entry.name },
-      { replace: true }
-    );
-  };
+  const handleRetryList = useCallback(() => {
+    void loadDirectory(currentPath, { force: true });
+  }, [currentPath, loadDirectory]);
 
-  const handlePrev = () => {
-    openLightboxByIndex(activeLightboxIndex - 1);
-  };
+  const handleRetryConnection = useCallback(() => {
+    retryTree?.();
+    void loadDirectory(currentPath, { force: true });
+  }, [currentPath, loadDirectory, retryTree]);
+  const showConnectionLightbox = (status.error || treeStatus.error)
+    && !status.loading
+    && !treeStatus.loading;
 
-  const handleNext = () => {
-    openLightboxByIndex(activeLightboxIndex + 1);
-  };
-
-  useEffect(() => {
-    const applyUrlState = () => {
-      const urlState = readUrlState();
-      const derivedPath = urlState.path;
-      void navigateTo(derivedPath, { selectPath: urlState.preview, updateUrl: false });
-    };
-    applyUrlState();
-    const handlePop = () => applyUrlState();
-    window.addEventListener('popstate', handlePop);
-    return () => window.removeEventListener('popstate', handlePop);
-  }, [navigateTo]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    const mediaQuery = window.matchMedia('(max-width: 900px)');
-    const handleChange = (event) => setIsTreeHidden(event.matches);
-    if (mediaQuery.addEventListener) {
-      mediaQuery.addEventListener('change', handleChange);
-      return () => mediaQuery.removeEventListener('change', handleChange);
-    }
-    mediaQuery.addListener(handleChange);
-    return () => mediaQuery.removeListener(handleChange);
-  }, []);
+  useUrlSync({
+    clearSearch,
+    setSearchInput,
+    applySearch,
+    navigateTo,
+    setLightboxOpen,
+    searchStateRef
+  });
 
   return (
     <div className="page">
       <AppHeader
         rootLabel={rootLabel}
         onNavigateRoot={() => {
+          if (hasSearchState) {
+            clearSearch();
+          }
           void navigateTo('');
         }}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         zoomLevel={zoomLevel}
         onZoomChange={setZoomLevel}
-        search={search}
-        onSearchChange={setSearch}
+        searchValue={searchInput}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchInput}
+        onSearchSubmit={handleSearchSubmit}
+        onSearchClear={handleCloseSearch}
       />
 
       <div className={`breadcrumbs-bar${isTreeHidden ? ' tree-hidden' : ''}`}>
         <Breadcrumbs
           rootLabel={rootLabel}
           path={status.error ? lastGoodPath : currentPath}
-          onNavigate={navigateTo}
+          onNavigate={handleNavigate}
+          searchQuery={searchQuery}
         />
       </div>
 
       <main className={`layout zoom-${zoomLevel}`}>
-        <TreePanel
-          tree={tree}
-          currentPath={currentPath}
-          rootPath=""
-          onToggle={handleToggle}
-          onCollapseAll={collapseAll}
-          onNavigate={navigateTo}
-          hideHeader={Boolean(status.error)}
-        />
+        {!isTreeHidden && (
+          <TreePanel
+            tree={tree}
+            currentPath={searchQuery ? null : currentPath}
+            rootPath=""
+            rootLabel={rootLabel}
+            onToggle={handleToggle}
+            onCollapseAll={collapseAll}
+            onNavigate={handleNavigate}
+            hideHeader={Boolean(status.error)}
+            status={treeStatus}
+            onRetry={retryTree}
+          />
+        )}
 
         <DirectoryPanel
           directory={directory}
           rootLabel={rootLabel}
+          currentPath={currentPath}
           currentPathName={currentPathName}
           status={status}
           lastGoodPath={lastGoodPath}
-          onNavigate={navigateTo}
+          onNavigate={handleNavigate}
           sortKey={sortKey}
           sortDir={sortDir}
           onSortClick={handleSortClick}
@@ -205,20 +240,33 @@ export default function App() {
           viewMode={viewMode}
           zoomLevel={zoomLevel}
           onSelect={handleOpen}
-          selectedPath={selectedEntry?.path}
+          selectedPath={selected?.path || pendingSelectionPath}
+          searchQuery={searchQuery}
+          searchResults={searchResults}
+          searchStatus={searchStatus}
+          onRetrySearch={retrySearch}
+          onRetryList={handleRetryList}
         />
       </main>
 
       <AppFooter />
+
+      <ConnectionLightbox
+        open={showConnectionLightbox}
+        onRetry={handleRetryConnection}
+        rootLabel={rootLabel}
+      />
 
       <Lightbox
         open={lightboxOpen}
         selectedEntry={selectedEntry}
         lightboxEntries={lightboxEntries}
         activeIndex={activeLightboxIndex}
-        onClose={handleCloseLightbox}
+        onClose={handleClose}
         onPrev={handlePrev}
         onNext={handleNext}
+        showPath
+        onNavigatePath={handleNavigateFromLightbox}
       />
     </div>
   );

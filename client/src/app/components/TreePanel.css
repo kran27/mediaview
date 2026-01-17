@@ -15,8 +15,8 @@
   width: 28px;
   height: 28px;
   border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--panel-2);
+  border: 1px solid transparent;
+  background: transparent;
   color: var(--muted);
 }
 
@@ -26,9 +26,9 @@
 }
 
 .tree-collapse:hover {
-  color: var(--accent);
-  background: rgba(123, 31, 31, 0.08);
-  border-color: rgba(123, 31, 31, 0.35);
+  color: var(--text);
+  background: var(--panel-2);
+  border-color: var(--border);
 }
 
 .tree-node {

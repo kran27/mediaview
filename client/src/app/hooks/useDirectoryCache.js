@@ -1,5 +1,6 @@
 import { useCallback, useRef } from 'react';
 import { API_BASE } from '../../lib/api.js';
+import { createRequestError, normalizeRequestError } from '../../lib/request.js';
 import { getBasename } from '../../lib/format.js';
 import { buildStats } from '../../lib/stats.js';
 
@@ -62,21 +63,24 @@ export const useDirectoryCache = ({ updateTreeWithEntries }) => {
     if (existingRequest) return existingRequest;
     const encodedPath = encodePathSegments(key);
     const url = encodedPath ? `${API_BASE}/api/list/${encodedPath}` : `${API_BASE}/api/list`;
-    const request = fetch(url)
-      .then((response) => {
+    const request = (async () => {
+      try {
+        const response = await fetch(url);
         if (!response.ok) {
           if (response.status === 404) {
-            throw new Error('Requested content could not be found.');
+            throw createRequestError('Requested content could not be found.', response.status);
           }
-          throw new Error(`Failed to load ${key || 'root'}`);
+          throw createRequestError(`Failed to load ${key || 'root'}`, response.status);
         }
         return response.json();
-      })
-      .finally(() => {
+      } catch (error) {
+        throw normalizeRequestError(error, `Failed to load ${key || 'root'}`);
+      } finally {
         if (inflightRef.current.get(key) === request) {
           inflightRef.current.delete(key);
         }
-      });
+      }
+    })();
     inflightRef.current.set(key, request);
     return request;
   }, []);

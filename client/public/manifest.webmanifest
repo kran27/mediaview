@@ -1,0 +1,15 @@
+{
+  "name": "The Mirror's Edge Archive",
+  "short_name": "Mirror's Edge Archive",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f2f0ee",
+  "theme_color": "#f2f0ee",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "250x250",
+      "type": "image/png"
+    }
+  ]
+}

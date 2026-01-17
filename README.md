@@ -75,6 +75,13 @@ NODE_ENV=production npm start
 The server will serve the static client from `client/dist`. You can override this with `CLIENT_DIST=/path/to/dist`.
 To run workers in the same process for a single-container setup, use `node index.js combined`.
 
+## Frontend configuration
+
+Set these as Vite env variables (e.g., `client/.env.local` or your shell) and restart the dev server:
+
+- `VITE_API_BASE`: Base URL for API requests (default: empty, same origin).
+- `VITE_SHOW_STAGING`: Toggle the `STAGING` label in the header (`true`/`false`, default: `true`).
+
 ## Docker
 
 Build the image and run it with your archive mounted (defaults to `combined` mode):

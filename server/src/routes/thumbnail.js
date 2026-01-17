@@ -110,7 +110,8 @@ export const registerThumbnailRoute = (app) => {
       });
       fs.createReadStream(thumbPath).pipe(res);
     } catch (error) {
-      res.status(500).json({ error: 'Failed to load thumbnail', detail: error.message });
+      console.error('Thumbnail request failed', error);
+      res.status(500).json({ error: 'Failed to load thumbnail' });
     }
   };
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { API_BASE } from '../../lib/api.js';
+import { createRequestError, normalizeRequestError } from '../../lib/request.js';
 import { getBasename } from '../../lib/format.js';
 
 const initialTree = {
@@ -8,9 +9,9 @@ const initialTree = {
 
 export const useDirectoryTree = () => {
   const [tree, setTree] = useState(initialTree);
+  const [treeStatus, setTreeStatus] = useState({ loading: true, error: null, retryable: false });
   const treeHydratedRef = useRef(false);
   const treePrefetchingRef = useRef(true);
-  const treeFetchRef = useRef(null);
 
   const applyTreeNodes = useCallback((nodes) => {
     if (!nodes) return;
@@ -114,42 +115,51 @@ export const useDirectoryTree = () => {
   }, []);
 
   const fetchTree = useCallback(async () => {
-    const response = await fetch(`${API_BASE}/api/tree`);
-    if (!response.ok) {
-      throw new Error('Failed to load tree');
+    try {
+      const response = await fetch(`${API_BASE}/api/tree`);
+      if (!response.ok) {
+        throw createRequestError('Failed to load tree', response.status);
+      }
+      return response.json();
+    } catch (error) {
+      throw normalizeRequestError(error, 'Failed to load tree');
     }
-    return response.json();
   }, []);
 
-  useEffect(() => {
-    let isActive = true;
-    if (!treeFetchRef.current) {
-      treePrefetchingRef.current = true;
-      treeFetchRef.current = fetchTree();
-    }
-    treeFetchRef.current
-      .then((data) => {
-        if (!isActive) return;
-        applyTreeNodes(data?.nodes);
-        treeHydratedRef.current = true;
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!isActive) return;
-        treePrefetchingRef.current = false;
+  const loadTree = useCallback(async () => {
+    setTreeStatus({ loading: true, error: null, retryable: false });
+    treePrefetchingRef.current = true;
+    try {
+      const data = await fetchTree();
+      applyTreeNodes(data?.nodes);
+      treeHydratedRef.current = true;
+      setTreeStatus({ loading: false, error: null, retryable: false });
+    } catch (error) {
+      const normalized = normalizeRequestError(error, 'Failed to load tree');
+      setTreeStatus({
+        loading: false,
+        error: normalized.message,
+        retryable: Boolean(normalized.retryable)
       });
-    return () => {
-      isActive = false;
-    };
+    } finally {
+      treePrefetchingRef.current = false;
+    }
   }, [applyTreeNodes, fetchTree]);
+
+  useEffect(() => {
+    loadTree().catch(() => {});
+    return undefined;
+  }, [loadTree]);
 
   return {
     tree,
+    treeStatus,
     treeHydratedRef,
     treePrefetchingRef,
     updateTreeWithEntries,
     expandAncestors,
     toggleNode,
-    collapseAll
+    collapseAll,
+    retryTree: loadTree
   };
 };

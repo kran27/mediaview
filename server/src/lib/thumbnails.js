@@ -5,7 +5,15 @@ import path from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { EXCLUDE_PATTERNS, ROOT_DIR, THUMB_DIR, THUMB_EXT, THUMB_SIZES } from '../config.js';
 import { isThumbablePath } from './classify.js';
-import { getHashEntries, getHashEntry, onHashScanComplete } from './hash-cache.js';
+import {
+  THUMB_ERR_LIMIT,
+  getHashEntries,
+  getHashEntry,
+  getThumbErrCount,
+  incrementThumbErrCount,
+  resetThumbErrCount,
+  onHashScanComplete,
+} from './hash-cache.js';
 
 const WORKER_POOL_LIMIT = 4;
 const VERIFY_THUMBS_INTERVAL_MS = 60 * 60 * 1000;
@@ -38,6 +46,7 @@ export const enqueueThumbnailJobs = (paths) => {
   uniquePaths.forEach((relativePath) => {
     const cached = getHashEntry(relativePath);
     if (!cached?.hash) return;
+    if (getThumbErrCount(relativePath) > THUMB_ERR_LIMIT) return;
     entries.push({
       path: relativePath,
       hash: cached.hash,
@@ -68,6 +77,7 @@ const verifyThumbnailCoverage = () => {
     const entries = getHashEntries();
     entries.forEach((entry) => {
       if (!entry?.path || !entry?.hash) return;
+      if (getThumbErrCount(entry.path) > THUMB_ERR_LIMIT) return;
       if (!isThumbablePath(entry.path)) return;
       const originalName = path.basename(entry.path);
       const missing = sizeKeys.some((sizeKey) => {
@@ -116,6 +126,7 @@ const dispatchSync = (updates, removals) => {
   const buckets = new Map();
   updates.forEach((entry) => {
     if (!entry?.path) return;
+    if (getThumbErrCount(entry.path) > THUMB_ERR_LIMIT) return;
     const index = getWorkerIndex(entry.path);
     if (!buckets.has(index)) buckets.set(index, { updates: [], removals: [] });
     buckets.get(index).updates.push(entry);
@@ -155,6 +166,14 @@ export const startThumbnailWorker = async () => {
       });
       worker.on('error', (error) => {
         console.error(`Thumbnail worker ${index + 1} error`, error);
+      });
+      worker.on('message', (message) => {
+        if (message?.type === 'thumb-error' && message.path) {
+          incrementThumbErrCount(message.path);
+        }
+        if (message?.type === 'thumb-success' && message.path) {
+          resetThumbErrCount(message.path);
+        }
       });
       worker.on('exit', (code) => {
         if (code !== 0) {

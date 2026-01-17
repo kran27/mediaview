@@ -14,10 +14,12 @@ import { classifyFile } from './classify.js';
 export const HASH_CACHE_DIR = CACHE_ROOT;
 export const HASH_CACHE_FILE = path.join(HASH_CACHE_DIR, 'file-hashes.json');
 const MAX_WORKER_CACHE_ENTRIES = 20000;
+export const THUMB_ERR_LIMIT = 2;
 
 const HASH_CACHE = new Map();
 const ENTRY_INDEX = new Map();
 const DIR_CHILDREN = new Map();
+const NAME_INDEX = new Map();
 const hashListeners = new Set();
 const scanListeners = new Set();
 let cacheWorker = null;
@@ -53,14 +55,18 @@ const ensureDirEntry = (relativePath) => {
   const key = relativePath || '';
   const existing = ENTRY_INDEX.get(key);
   if (!existing || !existing.isDir) {
+    const name = key ? path.basename(key) : ROOT_NAME;
     ENTRY_INDEX.set(key, {
-      name: key ? path.basename(key) : ROOT_NAME,
+      name,
       path: key,
       isDir: true,
       size: null,
       ext: '',
       type: 'dir',
     });
+    NAME_INDEX.set(key, name.toLowerCase());
+  } else if (existing?.name) {
+    NAME_INDEX.set(key, existing.name.toLowerCase());
   }
   if (!DIR_CHILDREN.has(key)) {
     DIR_CHILDREN.set(key, new Set());
@@ -75,14 +81,16 @@ const ensureDirEntry = (relativePath) => {
 const upsertFileEntry = (relativePath, entry) => {
   if (!relativePath) return;
   const ext = path.extname(relativePath).toLowerCase();
+  const name = path.basename(relativePath);
   ENTRY_INDEX.set(relativePath, {
-    name: path.basename(relativePath),
+    name,
     path: relativePath,
     isDir: false,
     size: entry.size ?? null,
     ext,
     type: classifyFile(ext),
   });
+  NAME_INDEX.set(relativePath, name.toLowerCase());
   const parentPath = getParentPath(relativePath);
   if (parentPath !== null) {
     ensureDirEntry(parentPath);
@@ -102,6 +110,7 @@ const removeEntryIndex = (relativePath) => {
     DIR_CHILDREN.delete(relativePath);
   }
   ENTRY_INDEX.delete(relativePath);
+  NAME_INDEX.delete(relativePath);
   const parentPath = getParentPath(relativePath);
   if (parentPath !== null) {
     DIR_CHILDREN.get(parentPath)?.delete(relativePath);
@@ -118,7 +127,15 @@ const ensureCacheDir = async () => {
 const serializeCache = () => {
   const entries = {};
   for (const [relativePath, entry] of HASH_CACHE.entries()) {
-    entries[relativePath] = entry;
+    const payload = {
+      hash: entry.hash,
+      mtimeMs: entry.mtimeMs,
+      size: entry.size ?? null,
+    };
+    if ((entry.thumbErrCount ?? 0) > 0) {
+      payload.thumbErrCount = entry.thumbErrCount;
+    }
+    entries[relativePath] = payload;
   }
   return { version: 1, entries };
 };
@@ -164,6 +181,7 @@ const resetCacheState = () => {
   HASH_CACHE.clear();
   ENTRY_INDEX.clear();
   DIR_CHILDREN.clear();
+  NAME_INDEX.clear();
   pendingThumbUpdates.clear();
   pendingThumbRemovals.clear();
   ensureDirEntry('');
@@ -175,11 +193,16 @@ const applyCacheEntries = (entries) => {
   resetCacheState();
   Object.entries(entries).forEach(([relativePath, entry]) => {
     if (!entry?.hash || !Number.isFinite(entry.mtimeMs)) return;
-    HASH_CACHE.set(relativePath, {
+    const thumbErrCount = Number.isFinite(entry.thumbErrCount) ? entry.thumbErrCount : 0;
+    const payload = {
       hash: entry.hash,
       mtimeMs: entry.mtimeMs,
       size: entry.size ?? null,
-    });
+    };
+    if (thumbErrCount > 0) {
+      payload.thumbErrCount = thumbErrCount;
+    }
+    HASH_CACHE.set(relativePath, payload);
     upsertFileEntry(relativePath, entry);
   });
 };
@@ -227,11 +250,19 @@ const flushThumbQueue = () => {
 
 export const setHashEntry = (relativePath, entry, options = {}) => {
   if (!relativePath || !entry?.hash) return;
-  HASH_CACHE.set(relativePath, {
+  const existing = HASH_CACHE.get(relativePath);
+  const thumbErrCount = existing?.hash === entry.hash
+    ? (existing?.thumbErrCount ?? 0)
+    : 0;
+  const payload = {
     hash: entry.hash,
     mtimeMs: entry.mtimeMs,
     size: entry.size ?? null,
-  });
+  };
+  if (thumbErrCount > 0) {
+    payload.thumbErrCount = thumbErrCount;
+  }
+  HASH_CACHE.set(relativePath, payload);
   upsertFileEntry(relativePath, entry);
   markDirty();
   if (options.emit !== false) {
@@ -286,17 +317,45 @@ export const getHashEntry = (relativePath) => HASH_CACHE.get(relativePath) || nu
 export const getHashEntries = () => {
   const entries = [];
   for (const [relativePath, entry] of HASH_CACHE.entries()) {
-    entries.push({
+    const payload = {
       path: relativePath,
       hash: entry.hash,
       mtimeMs: entry.mtimeMs,
       size: entry.size ?? null,
-    });
+    };
+    if ((entry.thumbErrCount ?? 0) > 0) {
+      payload.thumbErrCount = entry.thumbErrCount;
+    }
+    entries.push(payload);
   }
   return entries;
 };
 
 export const hasHashEntry = (relativePath) => HASH_CACHE.has(relativePath);
+
+export const getThumbErrCount = (relativePath) =>
+  HASH_CACHE.get(relativePath)?.thumbErrCount ?? 0;
+
+export const incrementThumbErrCount = (relativePath) => {
+  if (!relativePath) return 0;
+  const existing = HASH_CACHE.get(relativePath);
+  if (!existing) return 0;
+  const nextCount = (existing.thumbErrCount ?? 0) + 1;
+  HASH_CACHE.set(relativePath, { ...existing, thumbErrCount: nextCount });
+  markDirty();
+  scheduleFlush();
+  return nextCount;
+};
+
+export const resetThumbErrCount = (relativePath) => {
+  if (!relativePath) return;
+  const existing = HASH_CACHE.get(relativePath);
+  if (!existing || (existing.thumbErrCount ?? 0) === 0) return;
+  const { thumbErrCount, ...rest } = existing;
+  HASH_CACHE.set(relativePath, rest);
+  markDirty();
+  scheduleFlush();
+};
 
 export const hasDirectoryEntry = (relativePath) =>
   ENTRY_INDEX.get(relativePath || '')?.isDir === true;
@@ -477,6 +536,12 @@ export const startHashCacheFileWatcher = async () => {
 export const getHashCacheStatus = () => ({
   entries: HASH_CACHE.size,
   workerRunning: Boolean(cacheWorker),
+  thumbErrors: {
+    limit: THUMB_ERR_LIMIT,
+    paths: [...HASH_CACHE.entries()]
+      .filter(([, entry]) => (entry?.thumbErrCount ?? 0) > THUMB_ERR_LIMIT)
+      .map(([relativePath]) => relativePath),
+  },
   lastScan: {
     startedAt: cacheStatus.lastScanStart ? new Date(cacheStatus.lastScanStart).toISOString() : null,
     finishedAt: cacheStatus.lastScanEnd ? new Date(cacheStatus.lastScanEnd).toISOString() : null,
@@ -485,3 +550,51 @@ export const getHashCacheStatus = () => ({
     removals: cacheStatus.lastScanRemovals,
   },
 });
+
+const DEFAULT_SEARCH_LIMIT = 100;
+const SEARCH_CHUNK_SIZE = 500;
+
+export const searchHashCache = async (query) => {
+  const normalized = String(query || '').trim().toLowerCase();
+  if (!normalized) {
+    return { results: [], truncated: false };
+  }
+  const limit = DEFAULT_SEARCH_LIMIT;
+  const results = [];
+  let truncated = false;
+  let scanned = 0;
+
+  for (const [pathValue, nameLower] of NAME_INDEX.entries()) {
+    if (!pathValue) {
+      continue;
+    }
+    scanned += 1;
+    if (nameLower && nameLower.includes(normalized)) {
+      const entry = ENTRY_INDEX.get(pathValue);
+      if (entry) {
+        results.push({
+          name: entry.name,
+          path: entry.path,
+          isDir: entry.isDir,
+          size: entry.size ?? null,
+          ext: entry.ext,
+          type: entry.type,
+        });
+      }
+      if (results.length >= limit) {
+        truncated = true;
+        break;
+      }
+    }
+    if (scanned % SEARCH_CHUNK_SIZE === 0) {
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+  }
+
+  results.sort((a, b) => {
+    if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+    return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+  });
+
+  return { results, truncated };
+};

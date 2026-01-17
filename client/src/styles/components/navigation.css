@@ -112,17 +112,21 @@
   color: var(--accent);
 }
 
+.crumb.current {
+  cursor: pointer;
+}
+
 .crumb:hover {
   background: var(--panel-2);
 }
 
 .breadcrumbs-bar.tree-hidden .crumb.current {
-  background: rgba(123, 31, 31, 0.12);
+  background: var(--accent-bg-emphasis);
 }
 
 
 .breadcrumbs-bar.tree-hidden .crumb.current:not(.is-home):hover {
-  background: rgba(123, 31, 31, 0.16);
+  background: var(--accent-bg-emphasis-hover);
 }
 
 .crumb-separator {

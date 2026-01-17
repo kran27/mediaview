@@ -1,11 +1,12 @@
 import './TreePanel.css';
-import { IconFolder } from './Icons.jsx';
+import { IconFolder } from './index.js';
 
-const TreeNode = ({ node, tree, currentPath, onToggle, onNavigate, isRoot = false }) => {
+const TreeNode = ({ node, tree, currentPath, onToggle, onNavigate, isRoot = false, rootLabel }) => {
   const isLoaded = Array.isArray(node.children);
   const hasChildren = isLoaded && node.children.length > 0;
   const canExpand = !isLoaded || hasChildren;
   const isActive = node.path === currentPath;
+  const displayName = isRoot ? (rootLabel || node.name || 'Archive') : (node.name || 'Archive');
   return (
     <div className={`tree-node ${isRoot ? 'root-node' : ''} ${isActive ? 'active' : ''}`}>
       <div className="tree-node-row">
@@ -25,7 +26,7 @@ const TreeNode = ({ node, tree, currentPath, onToggle, onNavigate, isRoot = fals
           <span className="tree-icon">
             <IconFolder />
           </span>
-          <span className="tree-name">{node.name || 'Archive'}</span>
+          <span className="tree-name">{displayName}</span>
         </button>
       </div>
       {(isRoot || node.expanded) && hasChildren && (
@@ -41,6 +42,7 @@ const TreeNode = ({ node, tree, currentPath, onToggle, onNavigate, isRoot = fals
                 currentPath={currentPath}
                 onToggle={onToggle}
                 onNavigate={onNavigate}
+                rootLabel={rootLabel}
                 isRoot={false}
               />
             );
@@ -55,18 +57,23 @@ const TreePanel = ({
   tree,
   currentPath,
   rootPath,
+  rootLabel,
   onToggle,
   onNavigate,
   onCollapseAll,
-  hideHeader = false
+  hideHeader = false,
+  status,
+  onRetry
 }) => {
   const rootNode = tree[rootPath];
+  const hasError = Boolean(status?.error);
+  const isRetryable = Boolean(status?.retryable && onRetry);
   if (!rootNode) return null;
   return (
     <div className="panel tree-panel">
       <div className="panel-header">
         <div>
-          {!hideHeader && <span className="panel-title">Archive</span>}
+          {!hideHeader && <span className="panel-title">Folders</span>}
         </div>
         {!hideHeader && (
           <button
@@ -74,18 +81,30 @@ const TreePanel = ({
             className="tree-collapse"
             onClick={onCollapseAll}
             aria-label="Collapse all folders"
+            title="Collapse all folders"
           >
             <i className="bi bi-arrows-collapse icon" aria-hidden="true" />
           </button>
         )}
       </div>
       <div className="panel-body tree-scroll">
+        {hasError && (
+          <div className="state error">
+            <div>{status.error}</div>
+            {isRetryable && (
+              <button type="button" className="state-cta" onClick={onRetry}>
+                Retry
+              </button>
+            )}
+          </div>
+        )}
         <TreeNode
           node={rootNode}
           tree={tree}
           currentPath={currentPath}
           onToggle={onToggle}
           onNavigate={onNavigate}
+          rootLabel={rootLabel}
           isRoot
         />
       </div>

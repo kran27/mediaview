@@ -287,12 +287,19 @@ const processQueue = async () => {
       if (THUMB_VIDEO_EXTS.has(ext)) {
         const result = await generateVideoThumbnails(next, cachedHash);
         queueCreatedCount += result?.created || 0;
+        if (result?.hash) {
+          parentPort?.postMessage({ type: 'thumb-success', path: next });
+        }
       } else {
         const result = await generateThumbnails(next, cachedHash);
         queueCreatedCount += result?.created || 0;
+        if (result?.hash) {
+          parentPort?.postMessage({ type: 'thumb-success', path: next });
+        }
       }
     } catch (error) {
       console.error(`Thumbnail worker failed to generate thumbnail for ${next}`, error);
+      parentPort?.postMessage({ type: 'thumb-error', path: next });
     } finally {
       pending.delete(next);
     }
@@ -381,13 +388,20 @@ parentPort?.on('message', (message) => {
             if (THUMB_VIDEO_EXTS.has(ext)) {
               const result = await generateVideoThumbnails(entry.path, entry.hash, { force });
               createdCount += result?.created || 0;
+              if (result?.hash) {
+                parentPort?.postMessage({ type: 'thumb-success', path: entry.path });
+              }
             } else {
               const result = await generateThumbnails(entry.path, entry.hash, { force });
               createdCount += result?.created || 0;
+              if (result?.hash) {
+                parentPort?.postMessage({ type: 'thumb-success', path: entry.path });
+              }
             }
           }
         } catch (error) {
           console.error(`Thumbnail worker failed to sync thumbnail for ${entry.path}`, error);
+          parentPort?.postMessage({ type: 'thumb-error', path: entry.path });
         }
       }
       for (const pathValue of removals) {

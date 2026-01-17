@@ -1,7 +1,8 @@
+import { useEffect, useRef } from 'react';
 import '../../styles/components/media-list.css';
 import { buildThumbUrl } from '../../lib/api.js';
 import { formatSize } from '../../lib/format.js';
-import { iconForEntry } from './Icons.jsx';
+import { iconForEntry } from './index.js';
 
 const LIST_THUMB_SIZES = '32px';
 const THUMB_WIDTHS = { sm: 200, md: 400, lg: 600 };
@@ -35,6 +36,7 @@ const renderThumbStack = ({
       srcSet={buildThumbSrcSet(entry.path)}
       sizes={sizes}
       loading="lazy"
+      alt=""
       onLoad={handleThumbLoad}
       onError={handleThumbError}
     />
@@ -48,6 +50,26 @@ const FileList = ({
   onSelect,
   selectedPath
 }) => {
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    if (!selectedPath) return;
+    const root = containerRef.current;
+    if (!root) return;
+    const nodes = root.querySelectorAll('[data-path]');
+    let target = null;
+    nodes.forEach((node) => {
+      if (node.dataset.path === selectedPath) {
+        target = node;
+      }
+    });
+    if (!target) return;
+    const frameId = requestAnimationFrame(() => {
+      target.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+    });
+    return () => cancelAnimationFrame(frameId);
+  }, [entries, selectedPath, viewMode]);
+
   if (viewMode === 'grid') {
     const folders = [];
     const files = [];
@@ -61,7 +83,7 @@ const FileList = ({
     });
 
     return (
-      <div className="grid-sections">
+      <div className="grid-sections" ref={containerRef}>
         {folders.length > 0 && (
           <div className="grid grid-folders">
             {folders.map((entry, index) => {
@@ -70,6 +92,7 @@ const FileList = ({
                 <button
                   type="button"
                   key={entry.path}
+                  data-path={entry.path}
                   className={`grid-card grid-folder-card ${isSelected ? 'selected' : ''}`}
                   onClick={() => onSelect(entry)}
                   style={{ '--index': index }}
@@ -94,6 +117,7 @@ const FileList = ({
               <button
                 type="button"
                 key={entry.path}
+                data-path={entry.path}
                 className={`grid-card ${isSelected ? 'selected' : ''}`}
                 onClick={() => onSelect(entry)}
                 style={{ '--index': index }}
@@ -129,7 +153,7 @@ const FileList = ({
         <span className="list-cell name">Name</span>
         <span className="list-cell size">Size</span>
       </div>
-      <div className="list-body">
+      <div className="list-body" ref={containerRef}>
         {entries.map((entry, index) => {
           const isSelected = entry.path === selectedPath;
           const hasPreview = entry.type === 'image' || entry.type === 'video';
@@ -137,6 +161,7 @@ const FileList = ({
             <button
               type="button"
               key={entry.path}
+              data-path={entry.path}
               className={`list-row ${isSelected ? 'selected' : ''} ${entry.isDir ? 'is-dir' : ''}`}
               onClick={() => onSelect(entry)}
               style={{ '--index': index }}

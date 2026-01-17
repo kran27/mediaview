@@ -60,5 +60,21 @@ export default [
     rules: {
       'import/no-unresolved': 'off'
     }
+  },
+  {
+    files: ['src/app/components/**/*.jsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['./*.jsx', './**/*.jsx'],
+              message: 'Import components via the components/index.js barrel.'
+            }
+          ]
+        }
+      ]
+    }
   }
 ];

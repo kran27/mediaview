@@ -1,26 +1,67 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { searchArchive } from '../../lib/api.js';
 import { isViewableEntry } from '../../lib/fileTypes.js';
+import { getDirname } from '../../lib/format.js';
 import { useDirectoryTree } from './useDirectoryTree.js';
 import { useDirectoryCache } from './useDirectoryCache.js';
 
+
 export const useDirectoryData = () => {
+  const readStoredValue = (key) => {
+    if (typeof window === 'undefined') return null;
+    try {
+      return window.localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  };
+
+  const writeStoredValue = (key, value) => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(key, value);
+    } catch {
+      // Ignore storage write failures (private mode, blocked storage, etc.)
+    }
+  };
+
+  const viewModeKey = 'mediaview:viewMode';
+  const zoomLevelKey = 'mediaview:zoomLevel';
   const [directory, setDirectory] = useState(null);
   const [currentPath, setCurrentPath] = useState('');
   const [selected, setSelected] = useState(null);
-  const [search, setSearch] = useState('');
-  const [viewMode, setViewMode] = useState('grid');
-  const [zoomLevel, setZoomLevel] = useState('md');
+  const [pendingSelection, setPendingSelection] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchStatus, setSearchStatus] = useState({
+    loading: false,
+    error: null,
+    truncated: false,
+    retryable: false,
+  });
+  const [searchRetryToken, setSearchRetryToken] = useState(0);
+  const [viewMode, setViewMode] = useState(() => {
+    const stored = readStoredValue(viewModeKey);
+    return stored === 'list' || stored === 'grid' ? stored : 'grid';
+  });
+  const [zoomLevel, setZoomLevel] = useState(() => {
+    const stored = readStoredValue(zoomLevelKey);
+    return stored === 'sm' || stored === 'md' || stored === 'lg' ? stored : 'md';
+  });
   const [sortKey, setSortKey] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
-  const [status, setStatus] = useState({ loading: true, error: null });
+  const [status, setStatus] = useState({ loading: true, error: null, retryable: false });
   const {
     tree,
+    treeStatus,
     treeHydratedRef,
     treePrefetchingRef,
     updateTreeWithEntries,
     expandAncestors,
     toggleNode,
-    collapseAll
+    collapseAll,
+    retryTree
   } = useDirectoryTree();
   const {
     applyListing,
@@ -33,6 +74,27 @@ export const useDirectoryData = () => {
   const currentPathRef = useRef('');
   const [lastGoodPath, setLastGoodPath] = useState('');
   const resolvePathRef = useRef(0);
+
+  const submitSearch = useCallback((nextValue) => {
+    const trimmed = nextValue.trim();
+    if (!trimmed) {
+      setSearchResults([]);
+      setSearchStatus({ loading: false, error: null, truncated: false, retryable: false });
+    }
+    if (trimmed) {
+      setSearchResults([]);
+      setSearchStatus({ loading: true, error: null, truncated: false, retryable: false });
+    }
+    setSearchQuery(trimmed);
+  }, []);
+
+  const clearSearch = useCallback(() => {
+    setSearchInput('');
+    setSearchQuery('');
+    setSearchResults([]);
+    setSearchStatus({ loading: false, error: null, truncated: false, retryable: false });
+    setSearchRetryToken(0);
+  }, []);
 
   const setLastGoodPathValue = (value, options = {}) => {
     const { allowEmpty = false } = options;
@@ -51,18 +113,24 @@ export const useDirectoryData = () => {
     setCurrentPath(pathValue);
     setSelected(selection);
     expandAncestors(pathValue, data.root?.name || 'Archive');
-    setStatus({ loading: false, error: null });
+    setStatus({ loading: false, error: null, retryable: false });
   };
 
   const loadDirectory = async (pathValue, options = {}) => {
-    const { selectPath = '' } = options;
+    const { selectPath = '', openLightbox = true, force = false } = options;
+    setPendingSelection(selectPath || '');
+    if (selectPath) {
+      setSelected({ path: selectPath });
+    } else {
+      setSelected(null);
+    }
     const cached = getCachedListing(pathValue);
     if (!cached && pathValue && treeHydratedRef.current) {
       expandAncestors(pathValue, tree['']?.name || 'Archive');
     }
-    if (cached) {
+    if (cached && !force) {
       const selection = getSelection(cached.entries, selectPath);
-      const shouldLightbox = Boolean(selectPath) && isViewableEntry(selection);
+      const shouldLightbox = openLightbox && Boolean(selectPath) && isViewableEntry(selection);
       if (pathValue) {
         setLastGoodPathValue(pathValue);
       }
@@ -72,20 +140,20 @@ export const useDirectoryData = () => {
       }
       return { selection, shouldLightbox };
     }
-    setStatus({ loading: true, error: null });
+    setStatus({ loading: true, error: null, retryable: false });
     setCurrentPath(pathValue);
     if (pathValue && treeHydratedRef.current) {
       expandAncestors(pathValue, tree['']?.name || 'Archive');
     }
     try {
-      const listPromise = fetchList(pathValue);
+      const listPromise = fetchList(pathValue, { force });
       if (pathValue) {
         void hydratePathChain(pathValue);
       }
       const data = await listPromise;
       applyListing(pathValue, data, { expand: true });
       const selection = getSelection(data.entries, selectPath);
-      const shouldLightbox = Boolean(selectPath) && isViewableEntry(selection);
+      const shouldLightbox = openLightbox && Boolean(selectPath) && isViewableEntry(selection);
       if (pathValue) {
         setLastGoodPathValue(pathValue);
       }
@@ -101,7 +169,11 @@ export const useDirectoryData = () => {
           if (lastSuccess === null) return;
           setLastGoodPathValue(lastSuccess, { allowEmpty: true });
         });
-      setStatus({ loading: false, error: error.message });
+      setStatus({
+        loading: false,
+        error: error.message,
+        retryable: Boolean(error.retryable)
+      });
       return { selection: null, shouldLightbox: false };
     }
   };
@@ -120,7 +192,11 @@ export const useDirectoryData = () => {
       });
       applyListing(pathValue, data, { expand: false });
     } catch (error) {
-      setStatus({ loading: false, error: error.message });
+      setStatus({
+        loading: false,
+        error: error.message,
+        retryable: Boolean(error.retryable)
+      });
     }
   };
 
@@ -151,12 +227,63 @@ export const useDirectoryData = () => {
     currentPathRef.current = currentPath;
   }, [currentPath]);
 
+  useEffect(() => {
+    if (!pendingSelection || !directory?.entries) return;
+    const targetDir = getDirname(pendingSelection);
+    if (targetDir !== currentPath) return;
+    const match = directory.entries.find((entry) => entry.path === pendingSelection);
+    if (!match) return;
+    setSelected(match);
+    setPendingSelection('');
+  }, [currentPath, directory, pendingSelection]);
+
+  useEffect(() => {
+    let isActive = true;
+    if (!searchQuery) return undefined;
+    searchArchive(searchQuery)
+      .then((data) => {
+        if (!isActive) return;
+        const results = Array.isArray(data.results) ? data.results : [];
+        setSearchResults(results);
+        setSearchStatus({
+          loading: false,
+          error: null,
+          truncated: Boolean(data.truncated),
+          retryable: false,
+        });
+      })
+      .catch((error) => {
+        if (!isActive) return;
+        setSearchResults([]);
+        setSearchStatus({
+          loading: false,
+          error: error.message,
+          truncated: false,
+          retryable: Boolean(error.retryable)
+        });
+      });
+    return () => {
+      isActive = false;
+    };
+  }, [searchQuery, searchRetryToken]);
+
+  const retrySearch = useCallback(() => {
+    if (!searchQuery) return;
+    setSearchRetryToken((prev) => prev + 1);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    writeStoredValue(viewModeKey, viewMode);
+  }, [viewMode]);
+
+  useEffect(() => {
+    writeStoredValue(zoomLevelKey, zoomLevel);
+  }, [zoomLevel]);
+
   const filteredEntries = useMemo(() => {
-    if (!directory) return [];
-    const term = search.trim().toLowerCase();
-    const entries = term
-      ? directory.entries.filter((entry) => entry.name.toLowerCase().includes(term))
-      : directory.entries;
+    const entries = searchQuery
+      ? searchResults
+      : (directory ? directory.entries : []);
 
     const sorted = [...entries].sort((a, b) => {
       if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
@@ -173,7 +300,7 @@ export const useDirectoryData = () => {
     });
 
     return sorted;
-  }, [directory, search, sortKey, sortDir]);
+  }, [directory, searchQuery, searchResults, sortKey, sortDir]);
 
   return {
     directory,
@@ -181,10 +308,18 @@ export const useDirectoryData = () => {
     lastGoodPath,
     selected,
     setSelected,
+    pendingSelection,
     status,
     tree,
-    search,
-    setSearch,
+    treeStatus,
+    searchInput,
+    setSearchInput,
+    searchQuery,
+    submitSearch,
+    clearSearch,
+    searchResults,
+    searchStatus,
+    retrySearch,
     viewMode,
     setViewMode,
     zoomLevel,
@@ -195,6 +330,7 @@ export const useDirectoryData = () => {
     filteredEntries,
     loadDirectory,
     handleToggle,
-    collapseAll
+    collapseAll,
+    retryTree
   };
 };

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import DOMPurify from 'dompurify';
 import MarkdownIt from 'markdown-it';
-import { buildFileUrl } from '../lib/api.js';
-import { formatSize } from '../lib/format.js';
+import { buildFileUrl } from '../../lib/api.js';
+import { formatSize } from '../../lib/format.js';
 import {
   getEntryExtension,
   isAudioEntry,
@@ -11,8 +11,8 @@ import {
   isTextEntry,
   isVideoEntry,
   isViewableEntry
-} from '../lib/fileTypes.js';
-import { iconForEntry } from './components/index.js';
+} from '../../lib/fileTypes.js';
+import { iconForEntry } from './index.js';
 
 const LARGE_FILE_THRESHOLD_BYTES = 10 * 1024 * 1024;
 const TEXT_PREVIEW_MAX_BYTES = 5 * 1024 * 1024;
@@ -95,7 +95,7 @@ const supportsImageMime = (mimeType) => {
       const canvas = document.createElement('canvas');
       const dataUrl = canvas.toDataURL(mimeType);
       supported = dataUrl.startsWith(`data:${mimeType}`);
-    } catch (error) {
+    } catch {
       supported = false;
     }
   }
@@ -131,7 +131,9 @@ const Lightbox = ({
   activeIndex,
   onClose,
   onPrev,
-  onNext
+  onNext,
+  showPath = false,
+  onNavigatePath
 }) => {
   const [mediaLoading, setMediaLoading] = useState(false);
   const [mediaMeta, setMediaMeta] = useState({ width: null, height: null, duration: null });
@@ -140,8 +142,10 @@ const Lightbox = ({
     content: '',
     html: '',
     truncated: false,
-    error: ''
+    error: '',
+    retryable: false
   });
+  const [textRetryToken, setTextRetryToken] = useState(0);
   const [largeFileWarningDismissed, setLargeFileWarningDismissed] = useState(false);
   const [videoPreviewFailed, setVideoPreviewFailed] = useState(false);
   const [imagePreviewFailed, setImagePreviewFailed] = useState(false);
@@ -238,20 +242,44 @@ const Lightbox = ({
 
   useEffect(() => {
     if (!open || !selectedEntry || !isText) {
-      setTextPreview({ status: 'idle', content: '', html: '', truncated: false, error: '' });
+      setTextPreview({
+        status: 'idle',
+        content: '',
+        html: '',
+        truncated: false,
+        error: '',
+        retryable: false
+      });
       return undefined;
     }
     if (shouldGateLargeFile || !canPreviewText) {
-      setTextPreview({ status: 'idle', content: '', html: '', truncated: false, error: '' });
+      setTextPreview({
+        status: 'idle',
+        content: '',
+        html: '',
+        truncated: false,
+        error: '',
+        retryable: false
+      });
       return undefined;
     }
     let isActive = true;
     const loadText = async () => {
-      setTextPreview({ status: 'loading', content: '', html: '', truncated: false, error: '' });
+      setTextPreview({
+        status: 'loading',
+        content: '',
+        html: '',
+        truncated: false,
+        error: '',
+        retryable: false
+      });
       try {
         const response = await fetch(buildFileUrl(selectedEntry.path));
         if (!response.ok) {
-          throw new Error('Failed to load text preview');
+          const error = new Error('Failed to load text preview');
+          error.status = response.status;
+          error.retryable = response.status >= 500 || response.status === 408 || response.status === 429;
+          throw error;
         }
         const content = await response.text();
         if (!isActive) return;
@@ -260,16 +288,19 @@ const Lightbox = ({
           content,
           html: isMarkdown ? renderMarkdown(content) : '',
           truncated: false,
-          error: ''
+          error: '',
+          retryable: false
         });
       } catch (error) {
         if (!isActive) return;
+        const retryable = typeof error?.retryable === 'boolean' ? error.retryable : true;
         setTextPreview({
           status: 'error',
           content: '',
           html: '',
           truncated: false,
-          error: error.message
+          error: error.message,
+          retryable
         });
       }
     };
@@ -277,7 +308,7 @@ const Lightbox = ({
     return () => {
       isActive = false;
     };
-  }, [open, selectedEntry, shouldGateLargeFile, canPreviewText, isText, isMarkdown]);
+  }, [open, selectedEntry, shouldGateLargeFile, canPreviewText, isText, isMarkdown, textRetryToken]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -333,6 +364,8 @@ const Lightbox = ({
   if (!open || !selectedEntry || selectedEntry.isDir) return null;
 
   const previewSource = buildFileUrl(selectedEntry.path);
+  const pathValue = selectedEntry?.path || '';
+  const pathLabel = pathValue ? `/${pathValue}` : '/';
 
   return (
     <div className="lightbox" ref={lightboxRef} role="dialog" aria-modal="true">
@@ -445,7 +478,18 @@ const Lightbox = ({
             <div className={`lightbox-text${isMarkdown ? ' lightbox-markdown' : ''}`}>
               {textPreview.status === 'loading' && <div>Loading preview...</div>}
               {textPreview.status === 'error' && (
-                <div className="lightbox-error">{textPreview.error}</div>
+                <div className="lightbox-error">
+                  <span>{textPreview.error}</span>
+                  {textPreview.retryable && (
+                    <button
+                      type="button"
+                      className="lightbox-retry"
+                      onClick={() => setTextRetryToken((prev) => prev + 1)}
+                    >
+                      Retry
+                    </button>
+                  )}
+                </div>
               )}
               {textPreview.status === 'ready' && (
                 <>
@@ -495,6 +539,18 @@ const Lightbox = ({
                   </span>
                 )}
               </div>
+              {showPath && pathValue && (
+                <div className="lightbox-meta-path">
+                  <span>Location: </span>
+                  <button
+                    type="button"
+                    className="lightbox-path"
+                    onClick={() => onNavigatePath?.(selectedEntry)}
+                  >
+                    {pathLabel}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
