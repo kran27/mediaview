@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import '../styles/components/layout.css';
 import '../styles/components/lightbox.css';
 import '../styles/components/navigation.css';
@@ -15,7 +15,7 @@ import {
   TreePanel
 } from './components/index.js';
 import { getBasename } from '../lib/format.js';
-import { readUrlState, setUrlState } from '../lib/urlState.js';
+import { setUrlState } from '../lib/urlState.js';
 import { useDirectoryData } from './hooks/useDirectoryData.js';
 import { useLightboxState } from './hooks/useLightboxState.js';
 import { useResponsiveTree } from './hooks/useResponsiveTree.js';
@@ -31,8 +31,6 @@ export default function App() {
     status,
     tree,
     treeStatus,
-    searchInput,
-    setSearchInput,
     searchQuery,
     submitSearch,
     clearSearch,
@@ -55,8 +53,8 @@ export default function App() {
   } = useDirectoryData();
   const [lastBrowsePath, setLastBrowsePath] = useState('');
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const searchHeaderRef = useRef(null);
   const loadDirectoryRef = useRef(loadDirectory);
-  const hasSearchState = Boolean(searchQuery || searchInput.trim());
   const isSearchMode = Boolean(searchQuery);
   const searchStateRef = useRef({ searchQuery: '', searchInput: '' });
 
@@ -71,18 +69,32 @@ export default function App() {
   }, [loadDirectory]);
 
   useEffect(() => {
-    searchStateRef.current = { searchQuery, searchInput };
-  }, [searchQuery, searchInput]);
+    searchStateRef.current.searchQuery = searchQuery;
+  }, [searchQuery]);
 
-  useEffect(() => {
-    if (!searchQuery) return;
-    const urlState = readUrlState();
-    if (!urlState.search) {
-      clearSearch();
-    }
-  }, [clearSearch, searchQuery]);
+  const handleClearSearch = () => {
+    searchHeaderRef.current?.setSearchValue('');
+    searchHeaderRef.current?.setSearchFocused(false);
+    searchStateRef.current.searchInput = '';
+    clearSearch();
+  };
 
-  const navigateTo = useCallback(async (pathValue, options = {}) => {
+  const handleSearchValueChange = (value) => {
+    searchStateRef.current.searchInput = value;
+  };
+
+  const setSearchInputValue = (value) => {
+    searchHeaderRef.current?.setSearchValue(value);
+    searchStateRef.current.searchInput = value;
+  };
+
+  const hasSearchState = () => {
+    const inputValue = searchStateRef.current.searchInput;
+    return Boolean(searchQuery || inputValue.trim());
+  };
+
+
+  const navigateTo = async (pathValue, options = {}) => {
     const {
       selectPath = '',
       updateUrl = true,
@@ -103,14 +115,14 @@ export default function App() {
         { replace: replaceUrl }
       );
     }
-  }, [setLightboxOpen]);
+  };
 
-  const handleNavigate = useCallback((pathValue, options = {}) => {
-    if (hasSearchState) {
-      clearSearch();
+  const handleNavigate = (pathValue, options = {}) => {
+    if (hasSearchState()) {
+      handleClearSearch();
     }
     return navigateTo(pathValue, options);
-  }, [clearSearch, hasSearchState, navigateTo]);
+  };
 
   const {
     selectedEntry,
@@ -132,7 +144,7 @@ export default function App() {
     setLightboxOpen
   });
 
-  const applySearch = useCallback((value) => {
+  const applySearch = (value) => {
     const trimmed = value.trim();
     if (trimmed) {
       const fallbackPath = currentPath ?? lastGoodPath ?? '';
@@ -140,39 +152,39 @@ export default function App() {
     }
     submitSearch(trimmed);
     return trimmed;
-  }, [currentPath, lastGoodPath, submitSearch]);
+  };
 
-  const handleSearchSubmit = useCallback((value) => {
+  const handleSearchSubmit = (value) => {
     const trimmed = applySearch(value);
     if (trimmed) {
       setUrlState({ search: trimmed });
     } else {
       setUrlState({ path: currentPath, preview: '' });
     }
-  }, [applySearch, currentPath]);
+  };
 
 
-  const handleCloseSearch = useCallback(() => {
+  const handleCloseSearch = () => {
     const returnPath = lastBrowsePath ?? '';
-    clearSearch();
+    handleClearSearch();
     void navigateTo(returnPath);
-  }, [clearSearch, navigateTo, lastBrowsePath]);
+  };
 
-  const handleRetryList = useCallback(() => {
+  const handleRetryList = () => {
     void loadDirectory(currentPath, { force: true });
-  }, [currentPath, loadDirectory]);
+  };
 
-  const handleRetryConnection = useCallback(() => {
+  const handleRetryConnection = () => {
     retryTree?.();
     void loadDirectory(currentPath, { force: true });
-  }, [currentPath, loadDirectory, retryTree]);
+  };
   const showConnectionLightbox = (status.error || treeStatus.error)
     && !status.loading
     && !treeStatus.loading;
 
   useUrlSync({
-    clearSearch,
-    setSearchInput,
+    clearSearch: handleClearSearch,
+    setSearchInput: setSearchInputValue,
     applySearch,
     navigateTo,
     setLightboxOpen,
@@ -184,8 +196,8 @@ export default function App() {
       <AppHeader
         rootLabel={rootLabel}
         onNavigateRoot={() => {
-          if (hasSearchState) {
-            clearSearch();
+          if (hasSearchState()) {
+            handleClearSearch();
           }
           void navigateTo('');
         }}
@@ -193,21 +205,23 @@ export default function App() {
         onViewModeChange={setViewMode}
         zoomLevel={zoomLevel}
         onZoomChange={setZoomLevel}
-        searchValue={searchInput}
         searchQuery={searchQuery}
-        onSearchChange={setSearchInput}
+        ref={searchHeaderRef}
+        onSearchValueChange={handleSearchValueChange}
         onSearchSubmit={handleSearchSubmit}
         onSearchClear={handleCloseSearch}
       />
 
-      <div className={`breadcrumbs-bar${isTreeHidden ? ' tree-hidden' : ''}`}>
-        <Breadcrumbs
-          rootLabel={rootLabel}
-          path={status.error ? lastGoodPath : currentPath}
-          onNavigate={handleNavigate}
-          searchQuery={searchQuery}
-        />
-      </div>
+      {isTreeHidden && (
+        <div className="breadcrumbs-bar tree-hidden">
+          <Breadcrumbs
+            rootLabel={rootLabel}
+            path={status.error ? lastGoodPath : currentPath}
+            onNavigate={handleNavigate}
+            searchQuery={searchQuery}
+          />
+        </div>
+      )}
 
       <main className={`layout zoom-${zoomLevel}`}>
         {!isTreeHidden && (

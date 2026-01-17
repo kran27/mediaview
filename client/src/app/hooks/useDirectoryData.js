@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { searchArchive } from '../../lib/api.js';
 import { isViewableEntry } from '../../lib/fileTypes.js';
-import { getDirname } from '../../lib/format.js';
 import { useDirectoryTree } from './useDirectoryTree.js';
 import { useDirectoryCache } from './useDirectoryCache.js';
 
@@ -31,7 +30,6 @@ export const useDirectoryData = () => {
   const [currentPath, setCurrentPath] = useState('');
   const [selected, setSelected] = useState(null);
   const [pendingSelection, setPendingSelection] = useState('');
-  const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searchStatus, setSearchStatus] = useState({
@@ -75,7 +73,7 @@ export const useDirectoryData = () => {
   const [lastGoodPath, setLastGoodPath] = useState('');
   const resolvePathRef = useRef(0);
 
-  const submitSearch = useCallback((nextValue) => {
+  const submitSearch = (nextValue) => {
     const trimmed = nextValue.trim();
     if (!trimmed) {
       setSearchResults([]);
@@ -86,15 +84,14 @@ export const useDirectoryData = () => {
       setSearchStatus({ loading: true, error: null, truncated: false, retryable: false });
     }
     setSearchQuery(trimmed);
-  }, []);
+  };
 
-  const clearSearch = useCallback(() => {
-    setSearchInput('');
+  const clearSearch = () => {
     setSearchQuery('');
     setSearchResults([]);
     setSearchStatus({ loading: false, error: null, truncated: false, retryable: false });
     setSearchRetryToken(0);
-  }, []);
+  };
 
   const setLastGoodPathValue = (value, options = {}) => {
     const { allowEmpty = false } = options;
@@ -108,20 +105,29 @@ export const useDirectoryData = () => {
     return entries.find((entry) => entry.path === selectPath || entry.name === selectPath) || null;
   };
 
-  const applyDirectoryState = (data, pathValue, selection) => {
+  const applyDirectoryState = (data, pathValue, selection, selectPath, preserveSelection = false) => {
     setDirectory(data);
     setCurrentPath(pathValue);
-    setSelected(selection);
+    if (selection) {
+      setSelected(selection);
+      setPendingSelection('');
+    } else if (!selectPath) {
+      if (!preserveSelection) {
+        setSelected(null);
+      }
+      setPendingSelection('');
+    }
     expandAncestors(pathValue, data.root?.name || 'Archive');
     setStatus({ loading: false, error: null, retryable: false });
   };
 
   const loadDirectory = async (pathValue, options = {}) => {
     const { selectPath = '', openLightbox = true, force = false } = options;
+    const preserveSelection = !selectPath && pathValue === currentPathRef.current;
     setPendingSelection(selectPath || '');
     if (selectPath) {
       setSelected({ path: selectPath });
-    } else {
+    } else if (!preserveSelection) {
       setSelected(null);
     }
     const cached = getCachedListing(pathValue);
@@ -134,7 +140,7 @@ export const useDirectoryData = () => {
       if (pathValue) {
         setLastGoodPathValue(pathValue);
       }
-      applyDirectoryState(cached, pathValue, selection);
+      applyDirectoryState(cached, pathValue, selection, selectPath, preserveSelection);
       if (pathValue) {
         void hydratePathChain(pathValue);
       }
@@ -157,7 +163,7 @@ export const useDirectoryData = () => {
       if (pathValue) {
         setLastGoodPathValue(pathValue);
       }
-      applyDirectoryState(data, pathValue, selection);
+      applyDirectoryState(data, pathValue, selection, selectPath, preserveSelection);
       return { selection, shouldLightbox };
     } catch (error) {
       const fallbackPath = getLastResolvablePath(pathValue);
@@ -228,16 +234,6 @@ export const useDirectoryData = () => {
   }, [currentPath]);
 
   useEffect(() => {
-    if (!pendingSelection || !directory?.entries) return;
-    const targetDir = getDirname(pendingSelection);
-    if (targetDir !== currentPath) return;
-    const match = directory.entries.find((entry) => entry.path === pendingSelection);
-    if (!match) return;
-    setSelected(match);
-    setPendingSelection('');
-  }, [currentPath, directory, pendingSelection]);
-
-  useEffect(() => {
     let isActive = true;
     if (!searchQuery) return undefined;
     searchArchive(searchQuery)
@@ -267,10 +263,10 @@ export const useDirectoryData = () => {
     };
   }, [searchQuery, searchRetryToken]);
 
-  const retrySearch = useCallback(() => {
+  const retrySearch = () => {
     if (!searchQuery) return;
     setSearchRetryToken((prev) => prev + 1);
-  }, [searchQuery]);
+  };
 
   useEffect(() => {
     writeStoredValue(viewModeKey, viewMode);
@@ -280,7 +276,7 @@ export const useDirectoryData = () => {
     writeStoredValue(zoomLevelKey, zoomLevel);
   }, [zoomLevel]);
 
-  const filteredEntries = useMemo(() => {
+  const filteredEntries = (() => {
     const entries = searchQuery
       ? searchResults
       : (directory ? directory.entries : []);
@@ -300,7 +296,7 @@ export const useDirectoryData = () => {
     });
 
     return sorted;
-  }, [directory, searchQuery, searchResults, sortKey, sortDir]);
+  })();
 
   return {
     directory,
@@ -312,8 +308,6 @@ export const useDirectoryData = () => {
     status,
     tree,
     treeStatus,
-    searchInput,
-    setSearchInput,
     searchQuery,
     submitSearch,
     clearSearch,

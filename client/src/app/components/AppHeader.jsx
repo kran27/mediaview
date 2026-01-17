@@ -1,35 +1,45 @@
-import { useEffect, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { ViewToggle } from './index.js';
 
-const AppHeader = ({
+const AppHeader = forwardRef(({
   onNavigateRoot,
   viewMode,
   onViewModeChange,
   zoomLevel,
   onZoomChange,
-  searchValue,
   searchQuery,
-  onSearchChange,
+  onSearchValueChange,
   onSearchSubmit,
   onSearchClear
-}) => {
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
+}, ref) => {
   const inputRef = useRef(null);
+  const [searchValue, setSearchValue] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const searchValueRef = useRef('');
   const hasSearchText = Boolean(searchValue.trim() || searchQuery);
   const isSearchOpen = isSearchFocused || hasSearchText;
   const showStaging = import.meta.env.VITE_SHOW_STAGING !== 'false';
+
+  useImperativeHandle(ref, () => ({
+    setSearchValue: (value) => {
+      searchValueRef.current = value;
+      setSearchValue(value);
+      onSearchValueChange?.(value);
+    },
+    getSearchValue: () => searchValueRef.current,
+    setSearchFocused: (value) => {
+      setIsSearchFocused(value);
+      if (value) {
+        inputRef.current?.focus();
+      }
+    }
+  }), [onSearchValueChange]);
 
   useEffect(() => {
     if (isSearchFocused) {
       inputRef.current?.focus();
     }
   }, [isSearchFocused]);
-
-  useEffect(() => {
-    if (!hasSearchText && inputRef.current && document.activeElement !== inputRef.current) {
-      setIsSearchFocused(false);
-    }
-  }, [hasSearchText]);
 
   const handleSearchBlur = () => {
     if (!searchValue.trim() && !searchQuery) {
@@ -51,9 +61,12 @@ const AppHeader = ({
   };
 
   const handleSearchClear = () => {
+    searchValueRef.current = '';
+    setSearchValue('');
+    onSearchValueChange?.('');
     onSearchClear?.();
     inputRef.current?.focus();
-    if (!searchValue.trim() && !searchQuery) {
+    if (!searchQuery) {
       setIsSearchFocused(false);
     }
   };
@@ -98,7 +111,12 @@ const AppHeader = ({
             type="search"
             placeholder="Search the archive"
             value={searchValue}
-            onChange={(event) => onSearchChange(event.target.value)}
+            onChange={(event) => {
+              const { value } = event.target;
+              searchValueRef.current = value;
+              setSearchValue(value);
+              onSearchValueChange?.(value);
+            }}
             onFocus={() => setIsSearchFocused(true)}
             onBlur={handleSearchBlur}
           />
@@ -121,6 +139,8 @@ const AppHeader = ({
       </div>
     </header>
   );
-};
+});
+
+AppHeader.displayName = 'AppHeader';
 
 export default AppHeader;

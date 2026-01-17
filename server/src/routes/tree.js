@@ -5,6 +5,7 @@ export const registerTreeRoute = (app) => {
   app.get('/api/tree', (req, res) => {
     try {
       const nodes = getDirectoryTree();
+      res.setHeader('Cache-Control', 'public, max-age=60');
       res.json({
         root: { name: ROOT_NAME, path: '' },
         nodes,

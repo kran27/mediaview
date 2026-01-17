@@ -1,5 +1,5 @@
 import './TreePanel.css';
-import { IconFolder } from './index.js';
+import { IconDatabase, IconFolder } from './index.js';
 
 const TreeNode = ({ node, tree, currentPath, onToggle, onNavigate, isRoot = false, rootLabel }) => {
   const isLoaded = Array.isArray(node.children);
@@ -24,7 +24,7 @@ const TreeNode = ({ node, tree, currentPath, onToggle, onNavigate, isRoot = fals
         )}
         <button className="tree-label" type="button" onClick={() => onNavigate(node.path)}>
           <span className="tree-icon">
-            <IconFolder />
+            {isRoot ? <IconDatabase /> : <IconFolder />}
           </span>
           <span className="tree-name">{displayName}</span>
         </button>

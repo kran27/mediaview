@@ -31,6 +31,12 @@
   --breadcrumbs-height: 40px;
 }
 
+@media (max-width: 860px) {
+  :root {
+    --topbar-height: 104px;
+  }
+}
+
 :root[data-theme='dark'] {
   color-scheme: dark;
   --bg: #0f0f10;

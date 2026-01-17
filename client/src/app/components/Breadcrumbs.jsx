@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import '../../styles/components/navigation.css';
+import { IconDatabase } from './index.js';
 
 const Breadcrumbs = ({ path, onNavigate, searchQuery }) => {
   const scrollRef = useRef(null);
@@ -41,7 +42,7 @@ const Breadcrumbs = ({ path, onNavigate, searchQuery }) => {
           onClick={() => onNavigate('')}
           aria-label="Home"
         >
-          <i className="bi bi-house icon" aria-hidden="true" />
+          <IconDatabase />
           <span className="crumb-label">Home</span>
         </button>
         {isSearchActive && (

@@ -7,7 +7,7 @@ Web-based file browser and media viewer inspired by h5ai. The Node backend serve
 - List, grid, and tree navigation with lightbox previews
 - Path-based API endpoints for files, lists, thumbnails, and tree
 - SHA-256 hash cache with background scanning and thumbnail worker
-- CDN-friendly headers (ETag/Cache-Control) for file and thumbnail responses
+- CDN-friendly headers (ETag/Cache-Control) for file, list, tree, search, and thumbnail responses
 
 ## Structure
 
@@ -26,7 +26,6 @@ Web-based file browser and media viewer inspired by h5ai. The Node backend serve
 
 ```bash
 export ARCHIVE_ROOT="/absolute/path/to/archive"
-export ARCHIVE_NAME="archive.example.com"
 export CACHE_ROOT="/absolute/path/to/cache"
 ```
 
@@ -91,7 +90,6 @@ docker build -t mediaview .
 docker run --rm -p 3001:3001 \
   -e ARCHIVE_ROOT=/archive \
   -e CACHE_ROOT=/cache \
-  -e ARCHIVE_NAME="My Archive" \
   -v /absolute/path/to/archive:/archive:ro \
   -v /absolute/path/to/cache:/cache:rw \
   mediaview
@@ -108,7 +106,6 @@ server watches the shared `file-hashes.json` for changes.
 docker run --rm -p 3001:3001 \
   -e ARCHIVE_ROOT=/archive \
   -e CACHE_ROOT=/cache \
-  -e ARCHIVE_NAME="My Archive" \
   -v /absolute/path/to/archive:/archive:ro \
   -v /absolute/path/to/cache:/cache:rw \
   mediaview server
@@ -139,4 +136,5 @@ Use `server` or `worker` to override the default `combined` mode.
 - The backend only allows access inside `ARCHIVE_ROOT`.
 - Thumbnails and hashes are stored in `CACHE_ROOT`.
 - Video thumbnail generation requires `ffmpeg` to additionally be installed and available on PATH.
+- List, tree, and search responses are cached for 60 seconds; thumbnails are cached for 6 hours.
 - For production, build the client (`npm run build`) and serve it with your static server of choice.

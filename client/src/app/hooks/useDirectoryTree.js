@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { API_BASE } from '../../lib/api.js';
 import { createRequestError, normalizeRequestError } from '../../lib/request.js';
 import { getBasename } from '../../lib/format.js';
@@ -13,7 +13,7 @@ export const useDirectoryTree = () => {
   const treeHydratedRef = useRef(false);
   const treePrefetchingRef = useRef(true);
 
-  const applyTreeNodes = useCallback((nodes) => {
+  const applyTreeNodes = (nodes) => {
     if (!nodes) return;
     setTree((prev) => {
       const next = { ...prev };
@@ -29,9 +29,9 @@ export const useDirectoryTree = () => {
       });
       return next;
     });
-  }, []);
+  };
 
-  const updateTreeWithEntries = useCallback((pathValue, entries, options = {}) => {
+  const updateTreeWithEntries = (pathValue, entries, options = {}) => {
     const { expand = false, rootLabel } = options;
     setTree((prev) => {
       const next = { ...prev };
@@ -54,12 +54,12 @@ export const useDirectoryTree = () => {
               children: null
             };
           }
-        });
+      });
       return next;
     });
-  }, []);
+  };
 
-  const expandAncestors = useCallback((pathValue, rootLabel) => {
+  const expandAncestors = (pathValue, rootLabel) => {
     setTree((prev) => {
       const next = { ...prev };
       const resolvedRootLabel = rootLabel || prev['']?.name || 'Archive';
@@ -90,9 +90,9 @@ export const useDirectoryTree = () => {
       });
       return next;
     });
-  }, []);
+  };
 
-  const toggleNode = useCallback((pathValue) => {
+  const toggleNode = (pathValue) => {
     setTree((prev) => ({
       ...prev,
       [pathValue]: {
@@ -100,9 +100,9 @@ export const useDirectoryTree = () => {
         expanded: !prev[pathValue]?.expanded
       }
     }));
-  }, []);
+  };
 
-  const collapseAll = useCallback(() => {
+  const collapseAll = () => {
     setTree((prev) => {
       const next = {};
       Object.values(prev).forEach((node) => {
@@ -112,9 +112,9 @@ export const useDirectoryTree = () => {
       });
       return next;
     });
-  }, []);
+  };
 
-  const fetchTree = useCallback(async () => {
+  const fetchTree = async () => {
     try {
       const response = await fetch(`${API_BASE}/api/tree`);
       if (!response.ok) {
@@ -124,9 +124,9 @@ export const useDirectoryTree = () => {
     } catch (error) {
       throw normalizeRequestError(error, 'Failed to load tree');
     }
-  }, []);
+  };
 
-  const loadTree = useCallback(async () => {
+  const loadTree = async () => {
     setTreeStatus({ loading: true, error: null, retryable: false });
     treePrefetchingRef.current = true;
     try {
@@ -144,12 +144,15 @@ export const useDirectoryTree = () => {
     } finally {
       treePrefetchingRef.current = false;
     }
-  }, [applyTreeNodes, fetchTree]);
+  };
+
+  const loadTreeRef = useRef(loadTree);
+  loadTreeRef.current = loadTree;
 
   useEffect(() => {
-    loadTree().catch(() => {});
+    loadTreeRef.current().catch(() => {});
     return undefined;
-  }, [loadTree]);
+  }, []);
 
   return {
     tree,

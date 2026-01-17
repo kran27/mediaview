@@ -10,6 +10,7 @@ export const IconArchive = () => <i className="bi bi-file-zip icon" aria-hidden=
 export const IconDoc = () => <i className="bi bi-file-text icon" aria-hidden="true" />;
 export const IconGrid = () => <i className="bi bi-grid-3x3-gap icon" aria-hidden="true" />;
 export const IconList = () => <i className="bi bi-list icon" aria-hidden="true" />;
+export const IconDatabase = () => <i className="bi bi-database icon" aria-hidden="true" />;
 
 export const iconForEntry = (entry) => {
   if (entry.isDir) return <IconFolder />;

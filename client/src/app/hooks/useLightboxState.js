@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { isViewableEntry } from '../../lib/fileTypes.js';
 import { getDirname } from '../../lib/format.js';
 import { setUrlState } from '../../lib/urlState.js';
@@ -20,13 +20,12 @@ export const useLightboxState = ({
   const selectedEntry = selected && entries.find((entry) => entry.path === selected.path)
     ? selected
     : null;
-  const lightboxEntries = useMemo(() => entries.filter((entry) => !entry.isDir), [entries]);
-  const activeLightboxIndex = useMemo(() => {
-    if (!selectedEntry) return -1;
-    return lightboxEntries.findIndex((entry) => entry.path === selectedEntry.path);
-  }, [lightboxEntries, selectedEntry]);
+  const lightboxEntries = entries.filter((entry) => !entry.isDir);
+  const activeLightboxIndex = selectedEntry
+    ? lightboxEntries.findIndex((entry) => entry.path === selectedEntry.path)
+    : -1;
 
-  const handleViewMedia = useCallback((entry) => {
+  const handleViewMedia = (entry) => {
     if (!isViewableEntry(entry)) return;
     if (!selected || selected.path !== entry.path) {
       setSelected(entry);
@@ -35,9 +34,9 @@ export const useLightboxState = ({
     if (!isSearchMode) {
       setUrlState({ path: currentPath, preview: entry.name }, { replace: true });
     }
-  }, [currentPath, isSearchMode, selected, setLightboxOpen, setSelected]);
+  };
 
-  const handleOpen = useCallback((entry) => {
+  const handleOpen = (entry) => {
     if (entry.isDir) {
       void onNavigate(entry.path);
       return;
@@ -51,16 +50,16 @@ export const useLightboxState = ({
     if (!isSearchMode) {
       setUrlState({ path: currentPath, preview: entry.name }, { replace: true });
     }
-  }, [currentPath, handleViewMedia, isSearchMode, onNavigate, setLightboxOpen, setSelected]);
+  };
 
-  const handleClose = useCallback(() => {
+  const handleClose = () => {
     setLightboxOpen(false);
     if (!isSearchMode) {
       setUrlState({ path: currentPath, preview: '' }, { replace: true });
     }
-  }, [currentPath, isSearchMode, setLightboxOpen]);
+  };
 
-  const openLightboxByIndex = useCallback((index) => {
+  const openLightboxByIndex = (index) => {
     if (index < 0 || index >= lightboxEntries.length) return;
     const entry = lightboxEntries[index];
     if (!entry) return;
@@ -69,17 +68,17 @@ export const useLightboxState = ({
     if (!isSearchMode) {
       setUrlState({ path: currentPath, preview: entry.name }, { replace: true });
     }
-  }, [currentPath, isSearchMode, lightboxEntries, setLightboxOpen, setSelected]);
+  };
 
-  const handlePrev = useCallback(() => {
+  const handlePrev = () => {
     openLightboxByIndex(activeLightboxIndex - 1);
-  }, [activeLightboxIndex, openLightboxByIndex]);
+  };
 
-  const handleNext = useCallback(() => {
+  const handleNext = () => {
     openLightboxByIndex(activeLightboxIndex + 1);
-  }, [activeLightboxIndex, openLightboxByIndex]);
+  };
 
-  const handleNavigateFromLightbox = useCallback((entry) => {
+  const handleNavigateFromLightbox = (entry) => {
     if (!entry?.path) {
       setLightboxOpen(false);
       return Promise.resolve();
@@ -87,7 +86,7 @@ export const useLightboxState = ({
     const targetDir = getDirname(entry.path);
     setLightboxOpen(false);
     return onNavigate(targetDir, { selectPath: entry.path, openLightbox: false });
-  }, [onNavigate, setLightboxOpen]);
+  };
 
   return {
     lightboxOpen,

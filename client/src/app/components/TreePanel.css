@@ -38,7 +38,7 @@
 
 .tree-node-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   padding: 2px 0;
   min-width: 0;
   width: 100%;
@@ -79,7 +79,7 @@
 
 .tree-label {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
   text-align: left;
   padding: 3px 4px;

@@ -351,7 +351,8 @@ export const resetThumbErrCount = (relativePath) => {
   if (!relativePath) return;
   const existing = HASH_CACHE.get(relativePath);
   if (!existing || (existing.thumbErrCount ?? 0) === 0) return;
-  const { thumbErrCount, ...rest } = existing;
+  const rest = { ...existing };
+  delete rest.thumbErrCount;
   HASH_CACHE.set(relativePath, rest);
   markDirty();
   scheduleFlush();

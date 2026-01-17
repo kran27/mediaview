@@ -47,6 +47,7 @@ export const registerListRoute = (app) => {
         children[entry.path] = getDirectoryEntries(entry.path) || [];
       });
 
+    res.setHeader('Cache-Control', 'public, max-age=60');
     res.json({
       root: {
         name: ROOT_NAME,

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import DOMPurify from 'dompurify';
-import MarkdownIt from 'markdown-it';
+import snarkdown from 'snarkdown';
+import xss from 'xss';
 import { buildFileUrl } from '../../lib/api.js';
 import { formatSize } from '../../lib/format.js';
 import {
@@ -16,7 +16,6 @@ import { iconForEntry } from './index.js';
 
 const LARGE_FILE_THRESHOLD_BYTES = 10 * 1024 * 1024;
 const TEXT_PREVIEW_MAX_BYTES = 5 * 1024 * 1024;
-const markdownRenderer = new MarkdownIt({ html: false, linkify: true, breaks: true });
 const VIDEO_MIME_TYPES = {
   '.mp4': 'video/mp4',
   '.m4v': 'video/mp4',
@@ -69,8 +68,9 @@ const AUDIO_MIME_TYPES = {
   '.aiff': 'audio/aiff'
 };
 
-const renderMarkdown = (value) => DOMPurify.sanitize(markdownRenderer.render(value));
+const renderMarkdown = (value) => xss(snarkdown(value));
 
+const videoSupportCache = new Map();
 const isVideoPlayable = (entry) => {
   if (!isVideoEntry(entry)) return true;
   if (typeof document === 'undefined') return true;
@@ -78,10 +78,14 @@ const isVideoPlayable = (entry) => {
   if (ext === '.mkv') return true;
   const mimeType = VIDEO_MIME_TYPES[ext];
   if (!mimeType) return true;
+  if (videoSupportCache.has(mimeType)) {
+    return videoSupportCache.get(mimeType);
+  }
   const probe = document.createElement('video');
   const result = probe.canPlayType(mimeType);
-  console.log('Video playability for', entry.name, '(', mimeType, '):', result);
-  return result === 'probably' || result === 'maybe';
+  const playable = result === 'probably' || result === 'maybe';
+  videoSupportCache.set(mimeType, playable);
+  return playable;
 };
 
 const imageSupportCache = new Map();
@@ -112,16 +116,21 @@ const isImagePlayable = (entry) => {
   return supportsImageMime(mimeType);
 };
 
+const audioSupportCache = new Map();
 const isAudioPlayable = (entry) => {
   if (!isAudioEntry(entry)) return true;
   if (typeof document === 'undefined') return true;
   const ext = getEntryExtension(entry);
   const mimeType = AUDIO_MIME_TYPES[ext];
   if (!mimeType) return true;
+  if (audioSupportCache.has(mimeType)) {
+    return audioSupportCache.get(mimeType);
+  }
   const probe = document.createElement('audio');
   const result = probe.canPlayType(mimeType);
-  console.log('Audio playability for', entry.name, '(', mimeType, '):', result);
-  return result === 'probably' || result === 'maybe';
+  const playable = result === 'probably' || result === 'maybe';
+  audioSupportCache.set(mimeType, playable);
+  return playable;
 };
 
 const Lightbox = ({
@@ -171,9 +180,12 @@ const Lightbox = ({
     && Number.isFinite(selectedEntry?.size)
     && selectedEntry.size > TEXT_PREVIEW_MAX_BYTES;
   const canPreviewText = !isLargeText;
-  const canPreviewVideo = !isVideo || (isVideoPlayable(selectedEntry) && !videoPreviewFailed);
-  const canPreviewImage = !isImage || (isImagePlayable(selectedEntry) && !imagePreviewFailed);
-  const canPreviewAudio = !isAudio || isAudioPlayable(selectedEntry);
+  const videoPlayable = isVideoPlayable(selectedEntry);
+  const imagePlayable = isImagePlayable(selectedEntry);
+  const audioPlayable = isAudioPlayable(selectedEntry);
+  const canPreviewVideo = !isVideo || (videoPlayable && !videoPreviewFailed);
+  const canPreviewImage = !isImage || (imagePlayable && !imagePreviewFailed);
+  const canPreviewAudio = !isAudio || audioPlayable;
   const canPreviewEntry = isViewableEntry(selectedEntry)
     && canPreviewVideo
     && canPreviewImage

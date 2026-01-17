@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useRef } from 'react';
 import { API_BASE } from '../../lib/api.js';
 import { createRequestError, normalizeRequestError } from '../../lib/request.js';
 import { getBasename } from '../../lib/format.js';
@@ -26,9 +26,9 @@ export const useDirectoryCache = ({ updateTreeWithEntries }) => {
   const cacheRef = useRef(new Map());
   const inflightRef = useRef(new Map());
 
-  const getCachedListing = useCallback((pathValue) => cacheRef.current.get(pathValue), []);
+  const getCachedListing = (pathValue) => cacheRef.current.get(pathValue);
 
-  const applyListing = useCallback((pathValue, data, options = {}) => {
+  const applyListing = (pathValue, data, options = {}) => {
     cacheRef.current.set(pathValue, data);
     updateTreeWithEntries(pathValue, data.entries, {
       expand: options.expand ?? true,
@@ -55,9 +55,9 @@ export const useDirectoryCache = ({ updateTreeWithEntries }) => {
         });
       });
     }
-  }, [updateTreeWithEntries]);
+  };
 
-  const requestList = useCallback(async (pathValue) => {
+  const requestList = async (pathValue) => {
     const key = pathValue || '';
     const existingRequest = inflightRef.current.get(key);
     if (existingRequest) return existingRequest;
@@ -83,9 +83,9 @@ export const useDirectoryCache = ({ updateTreeWithEntries }) => {
     })();
     inflightRef.current.set(key, request);
     return request;
-  }, []);
+  };
 
-  const fetchList = useCallback(async (pathValue, options = {}) => {
+  const fetchList = async (pathValue, options = {}) => {
     const { force = false, background = false, onBackgroundUpdate } = options;
     const cached = getCachedListing(pathValue);
     if (cached && !force) {
@@ -102,9 +102,9 @@ export const useDirectoryCache = ({ updateTreeWithEntries }) => {
       return cached;
     }
     return requestList(pathValue);
-  }, [applyListing, getCachedListing, requestList]);
+  };
 
-  const hydratePathChain = useCallback(async (pathValue) => {
+  const hydratePathChain = async (pathValue) => {
     if (!pathValue) return;
     const chain = getPathChain(pathValue);
     const chainToFetch = chain.slice(0, -1);
@@ -144,9 +144,9 @@ export const useDirectoryCache = ({ updateTreeWithEntries }) => {
 
       index += 1;
     }
-  }, [applyListing, getCachedListing, requestList, updateTreeWithEntries]);
+  };
 
-  const getLastResolvablePath = useCallback((pathValue) => {
+  const getLastResolvablePath = (pathValue) => {
     const chain = getPathChain(pathValue);
     for (let index = chain.length - 1; index >= 0; index -= 1) {
       const candidate = chain[index];
@@ -155,9 +155,9 @@ export const useDirectoryCache = ({ updateTreeWithEntries }) => {
       }
     }
     return '';
-  }, [getCachedListing]);
+  };
 
-  const resolveLastGoodPath = useCallback(async (pathValue, shouldContinue) => {
+  const resolveLastGoodPath = async (pathValue, shouldContinue) => {
     const chain = getPathChain(pathValue);
     let lastSuccess = '';
     for (const chainPath of chain) {
@@ -173,7 +173,7 @@ export const useDirectoryCache = ({ updateTreeWithEntries }) => {
     }
     if (!shouldContinue()) return null;
     return lastSuccess;
-  }, [applyListing, fetchList]);
+  };
 
   return {
     applyListing,

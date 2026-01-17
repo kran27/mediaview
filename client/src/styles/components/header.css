@@ -161,7 +161,7 @@
 
 .search-clear {
   position: static;
-  width: 28px;
+  width: 32px;
   height: 100%;
   border-radius: 0;
   border: none;
@@ -291,5 +291,9 @@
 
   .search-label-short {
     display: inline;
+  }
+
+  .search-clear.is-hidden {
+    display: none;
   }
 }

@@ -49,7 +49,7 @@ export default [
       ...react.configs['jsx-runtime'].rules,
       ...jsxA11y.configs.recommended.rules,
       ...importPlugin.configs.recommended.rules,
-      ...reactHooks.configs.recommended.rules,
+      ...reactHooks.configs.flat.recommended.rules,
       'react/react-in-jsx-scope': 'off',
       'react/prop-types': 'off',
       'jsx-a11y/media-has-caption': 'off'
@@ -76,5 +76,5 @@ export default [
         }
       ]
     }
-  }
+  },
 ];

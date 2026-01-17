@@ -4,7 +4,7 @@ export const PORT = process.env.PORT || 3001;
 export const ROOT_DIR = process.env.ARCHIVE_ROOT
   ? path.resolve(process.env.ARCHIVE_ROOT)
   : path.resolve(process.cwd(), 'archive');
-export const ROOT_NAME = process.env.ARCHIVE_NAME || path.basename(ROOT_DIR);
+export const ROOT_NAME = path.basename(ROOT_DIR);
 export const ROOT_PREFIX = ROOT_DIR.endsWith(path.sep) ? ROOT_DIR : `${ROOT_DIR}${path.sep}`;
 export const CACHE_ROOT = process.env.CACHE_ROOT
   ? path.resolve(process.env.CACHE_ROOT)

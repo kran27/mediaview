@@ -28,13 +28,13 @@
 
 .panel-sort-btn.active {
   color: var(--accent);
-  border-color: var(--accent-border-soft);
-  background: var(--accent-bg-soft);
+  border-color: var(--divider-subtle);
+  background: rgba(0, 0, 0, 0.03);
   justify-content: center;
 }
 
 .panel-sort-btn.active .sort-icon {
-  opacity: 1;
+  opacity: 0.85;
 }
 
 .panel-sort-btn .sort-icon {

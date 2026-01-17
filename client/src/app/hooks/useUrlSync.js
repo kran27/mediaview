@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { readUrlState } from '../../lib/urlState.js';
 
 export const useUrlSync = ({
@@ -9,25 +9,53 @@ export const useUrlSync = ({
   setLightboxOpen,
   searchStateRef
 }) => {
+  const callbacksRef = useRef({
+    clearSearch,
+    setSearchInput,
+    applySearch,
+    navigateTo,
+    setLightboxOpen,
+    searchStateRef
+  });
+
+  useEffect(() => {
+    callbacksRef.current = {
+      clearSearch,
+      setSearchInput,
+      applySearch,
+      navigateTo,
+      setLightboxOpen,
+      searchStateRef
+    };
+  }, [applySearch, clearSearch, navigateTo, searchStateRef, setLightboxOpen, setSearchInput]);
+
   useEffect(() => {
     const applyUrlState = () => {
+      const {
+        clearSearch: currentClearSearch,
+        setSearchInput: currentSetSearchInput,
+        applySearch: currentApplySearch,
+        navigateTo: currentNavigateTo,
+        setLightboxOpen: currentSetLightboxOpen,
+        searchStateRef: currentSearchStateRef
+      } = callbacksRef.current;
       const urlState = readUrlState();
       if (urlState.search) {
-        setSearchInput(urlState.search);
-        applySearch(urlState.search);
-        setLightboxOpen(false);
+        currentSetSearchInput(urlState.search);
+        currentApplySearch(urlState.search);
+        currentSetLightboxOpen(false);
         return;
       }
-      const { searchQuery: currentQuery, searchInput: currentInput } = searchStateRef.current;
+      const { searchQuery: currentQuery, searchInput: currentInput } = currentSearchStateRef.current;
       if (currentQuery || currentInput.trim()) {
-        clearSearch();
+        currentClearSearch();
       }
       const derivedPath = urlState.path;
-      void navigateTo(derivedPath, { selectPath: urlState.preview, updateUrl: false });
+      void currentNavigateTo(derivedPath, { selectPath: urlState.preview, updateUrl: false });
     };
     applyUrlState();
     const handlePop = () => applyUrlState();
     window.addEventListener('popstate', handlePop);
     return () => window.removeEventListener('popstate', handlePop);
-  }, [applySearch, clearSearch, navigateTo, searchStateRef, setLightboxOpen, setSearchInput]);
+  }, []);
 };
