@@ -36,7 +36,8 @@
       "serverReadyAction": {
         "pattern": "Local:\\s+(http://\\S+)",
         "uriFormat": "%s",
-        "action": "debugWithEdge"
+        "action": "debugWithEdge",
+        "killOnServerStop": true
       }
     }
   ],
@@ -46,7 +47,8 @@
       "configurations": [
         "Server: dev (combined)",
         "Client: Vite dev server"
-      ]
+      ],
+      "stopAll": true
     }
   ]
 }
