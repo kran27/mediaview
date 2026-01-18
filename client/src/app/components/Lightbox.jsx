@@ -7,6 +7,7 @@ import {
   getEntryExtension,
   isAudioEntry,
   isDocumentEntry,
+  isDocumentPreviewEntry,
   isImageEntry,
   isTextEntry,
   isVideoEntry,
@@ -167,7 +168,7 @@ const Lightbox = ({
   const isImage = isImageEntry(selectedEntry);
   const isSvg = isImage && getEntryExtension(selectedEntry) === '.svg';
   const isAudio = isAudioEntry(selectedEntry);
-  const isDocument = isDocumentEntry(selectedEntry);
+  const isDocument = isDocumentPreviewEntry(selectedEntry);
   const isText = isTextEntry(selectedEntry);
   const isStreamable = isVideo || isAudio;
   const isMarkdown = isText && getEntryExtension(selectedEntry) === '.md';

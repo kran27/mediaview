@@ -87,9 +87,10 @@ const DOC_EXTS = new Set([
   '.ods',
   '.odp'
 ]);
+const DOC_PREVIEW_EXTS = new Set(['.pdf']);
 const TEXT_EXTS = new Set(['.txt', '.md', '.json', '.csv', '.log']);
 
-export const VIEWABLE_TYPES = new Set(['image', 'video', 'audio', 'document', 'text']);
+export const VIEWABLE_TYPES = new Set(['image', 'video', 'audio', 'text']);
 
 export const getEntryExtension = (entry) => {
   if (!entry) return '';
@@ -126,6 +127,12 @@ export const isDocumentEntry = (entry) => {
   return DOC_EXTS.has(ext);
 };
 
+export const isDocumentPreviewEntry = (entry) => {
+  if (!entry || entry.isDir) return false;
+  const ext = getEntryExtension(entry);
+  return DOC_PREVIEW_EXTS.has(ext);
+};
+
 export const isTextEntry = (entry) => {
   if (!entry || entry.isDir) return false;
   if (entry.type === 'text') return true;
@@ -148,7 +155,7 @@ export const isViewableEntry = (entry) =>
       || isImageEntry(entry)
       || isVideoEntry(entry)
       || isAudioEntry(entry)
-      || isDocumentEntry(entry)
+      || isDocumentPreviewEntry(entry)
       || isTextEntry(entry))
   );
 
