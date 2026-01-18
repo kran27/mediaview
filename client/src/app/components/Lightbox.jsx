@@ -4,7 +4,6 @@ import { formatSize } from '../../lib/format.js';
 import {
   getEntryExtension,
   isAudioEntry,
-  isDocumentEntry,
   isDocumentPreviewEntry,
   isImageEntry,
   isTextEntry,

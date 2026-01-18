@@ -30,6 +30,16 @@
   border-color: var(--accent-border-soft);
 }
 
+.panel-action-btn.is-primary {
+  color: var(--panel);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.panel-action-btn.is-primary:hover:not(:disabled) {
+  filter: brightness(1.02);
+}
+
 .panel-action-btn.is-secondary {
   color: var(--muted);
 }

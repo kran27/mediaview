@@ -47,8 +47,6 @@ export const useDirectoryData = () => {
     const stored = readStoredValue(zoomLevelKey);
     return stored === 'sm' || stored === 'md' || stored === 'lg' ? stored : 'md';
   });
-  const [sortKey, setSortKey] = useState('name');
-  const [sortDir, setSortDir] = useState('asc');
   const [status, setStatus] = useState({
     loading: true,
     error: null,
@@ -249,15 +247,6 @@ export const useDirectoryData = () => {
     toggleNode(pathValue);
   };
 
-  const handleSortClick = (key) => {
-    if (sortKey === key) {
-      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-      return;
-    }
-    setSortKey(key);
-    setSortDir('asc');
-  };
-
   const expandToCurrentPath = () => {
     expandAncestors(currentPathRef.current);
   };
@@ -309,28 +298,6 @@ export const useDirectoryData = () => {
     writeStoredValue(zoomLevelKey, zoomLevel);
   }, [zoomLevel]);
 
-  const filteredEntries = (() => {
-    const entries = searchQuery
-      ? searchResults
-      : (directory ? directory.entries : []);
-
-    const sorted = [...entries].sort((a, b) => {
-      if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
-      let compare = 0;
-      if (sortKey === 'name') {
-        compare = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
-      } else if (sortKey === 'size') {
-        compare = (a.size || 0) - (b.size || 0);
-      }
-      if (compare === 0) {
-        compare = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
-      }
-      return sortDir === 'asc' ? compare : -compare;
-    });
-
-    return sorted;
-  })();
-
   return {
     directory,
     currentPath,
@@ -351,10 +318,6 @@ export const useDirectoryData = () => {
     setViewMode,
     zoomLevel,
     setZoomLevel,
-    sortKey,
-    sortDir,
-    handleSortClick,
-    filteredEntries,
     loadDirectory,
     handleToggle,
     collapseAll,

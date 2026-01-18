@@ -49,10 +49,6 @@ export default function App() {
     setViewMode,
     zoomLevel,
     setZoomLevel,
-    sortKey,
-    sortDir,
-    handleSortClick,
-    filteredEntries,
     loadDirectory,
     handleToggle,
     collapseAll,
@@ -95,7 +91,9 @@ export default function App() {
   const rootLabel = 'Archive';
   const currentPathName = currentPath ? getBasename(currentPath) : rootLabel;
   const pendingSelectionPath = pendingSelection || '';
-  const activeEntries = filteredEntries;
+  const activeEntries = searchQuery
+    ? searchResults
+    : (directory?.entries || []);
   const isTreeHidden = useResponsiveTree(1100);
 
   useEffect(() => {
@@ -220,6 +218,12 @@ export default function App() {
   const handleContextCancelSelection = () => {
     setSelectionMode(false);
     closeContextMenu();
+  };
+
+  const handleContextGoToEntry = () => {
+    if (!contextMenu.entry) return;
+    closeContextMenu();
+    void handleNavigateFromLightbox(contextMenu.entry);
   };
 
   const handleRequestDownload = async () => {
@@ -362,10 +366,7 @@ export default function App() {
           status={status}
           lastGoodPath={lastGoodPath}
           onNavigate={handleNavigate}
-          sortKey={sortKey}
-          sortDir={sortDir}
-          onSortClick={handleSortClick}
-          entries={filteredEntries}
+          entries={activeEntries}
           viewMode={viewMode}
           zoomLevel={zoomLevel}
           onSelect={handleOpen}
@@ -389,6 +390,7 @@ export default function App() {
           onContextSelect={handleContextSelect}
           onContextDownload={handleContextDownload}
           onContextCancelSelection={handleContextCancelSelection}
+          onContextGoToEntry={handleContextGoToEntry}
           searchQuery={searchQuery}
           searchResults={searchResults}
           searchStatus={searchStatus}

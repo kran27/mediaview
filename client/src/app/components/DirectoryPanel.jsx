@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatSize } from '../../lib/format.js';
 import {
   FileList,
@@ -6,6 +6,7 @@ import {
   IconCheckCircleFill,
   IconClose,
   IconDownload,
+  IconFolder,
   SortButtons
 } from './index.js';
 
@@ -152,7 +153,7 @@ const DownloadProgressModal = ({
           || state.status === 'cancelled') && (
           <div className="download-progress-meta">
             {state.status === 'warning' && 'We finished the download, but some items may be missing.'}
-            {state.status === 'done' && 'Your download is ready.'}
+            {state.status === 'done' && 'The downloaded files can be found in the previously selected download location.'}
             {state.status === 'error' && 'Something went wrong while preparing the download.'}
             {state.status === 'cancelled' && 'The download was cancelled.'}
           </div>
@@ -189,9 +190,6 @@ const DirectoryPanel = ({
   status,
   lastGoodPath,
   onNavigate,
-  sortKey,
-  sortDir,
-  onSortClick,
   entries,
   viewMode,
   zoomLevel,
@@ -215,6 +213,7 @@ const DirectoryPanel = ({
   onContextSelect,
   onContextDownload,
   onContextCancelSelection,
+  onContextGoToEntry,
   searchQuery,
   searchResults,
   searchStatus,
@@ -240,6 +239,8 @@ const DirectoryPanel = ({
     : downloadState?.processedFiles;
   const downloadSummary = downloadPrompt?.summary;
   const showProgressModal = hasDownloadStatus;
+  const [sortKey, setSortKey] = useState('name');
+  const [sortDir, setSortDir] = useState('asc');
   const titleText = isSearchActive
     ? 'Search results'
     : isNotFound
@@ -259,6 +260,65 @@ const DirectoryPanel = ({
       : directory
         ? `${directory.stats.dirs} folders, ${directory.stats.files} files`
         : 'Loading...');
+  const sortedEntries = useMemo(() => {
+    const list = Array.isArray(entries) ? [...entries] : [];
+    if (list.length === 0) return list;
+    return list.sort((a, b) => {
+      if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+      let compare = 0;
+      if (sortKey === 'name') {
+        compare = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      } else if (sortKey === 'size') {
+        compare = (a.size || 0) - (b.size || 0);
+      }
+      if (compare === 0) {
+        compare = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      }
+      return sortDir === 'asc' ? compare : -compare;
+    });
+  }, [entries, sortKey, sortDir]);
+
+  const handleSortClick = (key) => {
+    if (sortKey === key) {
+      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+      return;
+    }
+    setSortKey(key);
+    setSortDir('asc');
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key !== 'Escape') return;
+      if (downloadPrompt?.open) {
+        onCancelDownloadPrompt();
+        return;
+      }
+      if (hasDownloadStatus) {
+        if (isDownloading) {
+          onCancelDownload();
+          return;
+        }
+        onSetSelectionMode(false);
+        onResetDownloadState();
+        return;
+      }
+      if (selectionMode) {
+        onSetSelectionMode(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    downloadPrompt,
+    hasDownloadStatus,
+    isDownloading,
+    onCancelDownload,
+    onCancelDownloadPrompt,
+    onResetDownloadState,
+    onSetSelectionMode,
+    selectionMode
+  ]);
   return (
     <div
       ref={panelRef}
@@ -270,7 +330,21 @@ const DirectoryPanel = ({
           <span className="panel-sub">{subLabel}</span>
         </div>
         <div className="panel-actions">
-          {!hasError && <SortButtons sortKey={sortKey} sortDir={sortDir} onSortClick={onSortClick} />}
+          {!hasError && (
+            <>
+              {!selectionMode && (
+                <button
+                  type="button"
+                  className="panel-action-btn"
+                  onClick={() => onSetSelectionMode(true)}
+                >
+                  <IconCheck2Square />
+                  Select
+                </button>
+              )}
+              <SortButtons sortKey={sortKey} sortDir={sortDir} onSortClick={handleSortClick} />
+            </>
+          )}
         </div>
       </div>
       <div className="panel-body">
@@ -292,7 +366,7 @@ const DirectoryPanel = ({
                   <span className="context-menu-icon" aria-hidden="true">
                     <IconClose />
                   </span>
-                  Cancel selection
+                  Cancel
                 </button>
               ) : (
                 <>
@@ -308,6 +382,14 @@ const DirectoryPanel = ({
                     </span>
                     Download
                   </button>
+                  {isSearchActive && (
+                    <button type="button" className="context-menu-item" onClick={onContextGoToEntry}>
+                      <span className="context-menu-icon" aria-hidden="true">
+                        <IconFolder />
+                      </span>
+                      Go to file in folder
+                    </button>
+                  )}
                 </>
               )}
             </div>
@@ -350,7 +432,7 @@ const DirectoryPanel = ({
             )}
             {!searchLoading && !searchError && searchCount > 0 && (
               <FileList
-                entries={entries}
+                entries={sortedEntries}
                 viewMode={viewMode}
                 onSelect={onSelect}
                 selectedPath={selectedPath}
@@ -388,7 +470,7 @@ const DirectoryPanel = ({
             )}
             {!status.loading && !status.error && (
               <FileList
-                entries={entries}
+                entries={sortedEntries}
                 viewMode={viewMode}
                 onSelect={onSelect}
                 selectedPath={selectedPath}
@@ -418,18 +500,20 @@ const DirectoryPanel = ({
             <button
               type="button"
               className="panel-action-btn"
-              onClick={onRequestDownload}
-              disabled={!hasSelection || isDownloading}
-            >
-              {isDownloading ? 'Downloading...' : `Download${hasSelection ? ` (${selectedCount})` : ''}`}
-            </button>
-            <button
-              type="button"
-              className="panel-action-btn"
               onClick={() => onSetSelectionMode(false)}
               disabled={isDownloading}
             >
-              Cancel selection
+              <IconClose />
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="panel-action-btn is-primary"
+              onClick={onRequestDownload}
+              disabled={!hasSelection || isDownloading}
+            >
+              <IconDownload />
+              {isDownloading ? 'Downloading...' : `Download${hasSelection ? ` (${selectedCount})` : ''}`}
             </button>
           </div>
         </div>

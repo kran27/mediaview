@@ -33,6 +33,7 @@ const INITIAL_DOWNLOAD_STATE = {
 const createZipWriter = async (filename, mode, fileSave) => {
   if (mode === 'fileSystem') {
     const handle = await window.showSaveFilePicker({
+      startIn: 'downloads',
       suggestedName: filename,
       types: [{ description: 'Zip archive', accept: { 'application/zip': ['.zip'] } }]
     });
@@ -93,11 +94,7 @@ export const useBatchDownload = () => {
     if (!nextMode) {
       setSelectedEntries(new Map());
     }
-  }, [normalizeEntry]);
-
-  const toggleSelectionMode = useCallback(() => {
-    setSelectionModeSafe(!selectionMode);
-  }, [selectionMode, setSelectionModeSafe]);
+  }, []);
 
   const toggleSelection = useCallback((entry) => {
     if (!entry?.path) return;
@@ -467,7 +464,6 @@ export const useBatchDownload = () => {
     selectionMode,
     selectedPaths,
     selectedCount,
-    toggleSelectionMode,
     setSelectionMode: setSelectionModeSafe,
     toggleSelection,
     setSelectionEntries,
