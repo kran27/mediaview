@@ -1,5 +1,11 @@
 import './TreePanel.css';
-import { IconChevronRight, IconCollapse, IconDatabase, IconFolder } from './index.js';
+import {
+  IconArrowsExpand,
+  IconChevronRight,
+  IconCollapse,
+  IconDatabase,
+  IconFolder
+} from './index.js';
 
 const TreeNode = ({ node, tree, currentPath, onToggle, onNavigate, isRoot = false, rootLabel }) => {
   const isLoaded = Array.isArray(node.children);
@@ -63,6 +69,7 @@ const TreePanel = ({
   onToggle,
   onNavigate,
   onCollapseAll,
+  onExpandCurrent,
   hideHeader = false,
   status,
   onRetry
@@ -70,6 +77,7 @@ const TreePanel = ({
   const rootNode = tree[rootPath];
   const hasError = Boolean(status?.error);
   const isRetryable = Boolean(status?.retryable && onRetry);
+  const canExpandCurrent = Boolean(currentPath);
   if (!rootNode) return null;
   return (
     <div className="panel tree-panel">
@@ -78,15 +86,27 @@ const TreePanel = ({
           {!hideHeader && <span className="panel-title">Folders</span>}
         </div>
         {!hideHeader && (
-          <button
-            type="button"
-            className="tree-collapse"
-            onClick={onCollapseAll}
-            aria-label="Collapse all folders"
-            title="Collapse all folders"
-          >
-            <IconCollapse />
-          </button>
+          <div className="tree-actions">
+            <button
+              type="button"
+              className="tree-expand"
+              onClick={onExpandCurrent}
+              aria-label="Reveal current folder"
+              title="Reveal current folder in the tree"
+              disabled={!canExpandCurrent || !onExpandCurrent}
+            >
+              <IconArrowsExpand />
+            </button>
+            <button
+              type="button"
+              className="tree-collapse"
+              onClick={onCollapseAll}
+              aria-label="Collapse all folders"
+              title="Collapse all folders"
+            >
+              <IconCollapse />
+            </button>
+          </div>
         )}
       </div>
       <div className="panel-body tree-scroll">

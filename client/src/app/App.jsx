@@ -48,6 +48,7 @@ export default function App() {
     loadDirectory,
     handleToggle,
     collapseAll,
+    expandToCurrentPath,
     lastGoodPath,
     retryTree
   } = useDirectoryData();
@@ -218,16 +219,14 @@ export default function App() {
         onSearchClear={handleCloseSearch}
       />
 
-      {isTreeHidden && (
-        <div className="breadcrumbs-bar tree-hidden">
-          <Breadcrumbs
-            rootLabel={rootLabel}
-            path={status.error ? lastGoodPath : currentPath}
-            onNavigate={handleNavigate}
-            searchQuery={searchQuery}
-          />
-        </div>
-      )}
+      <div className={`breadcrumbs-bar${isTreeHidden ? ' tree-hidden' : ''}`}>
+        <Breadcrumbs
+          rootLabel={rootLabel}
+          path={status.error ? lastGoodPath : currentPath}
+          onNavigate={handleNavigate}
+          searchQuery={searchQuery}
+        />
+      </div>
 
       <main className={`layout zoom-${zoomLevel}`}>
         {!isTreeHidden && (
@@ -238,6 +237,7 @@ export default function App() {
             rootLabel={rootLabel}
             onToggle={handleToggle}
             onCollapseAll={collapseAll}
+            onExpandCurrent={expandToCurrentPath}
             onNavigate={handleNavigate}
             hideHeader={false}
             status={treeStatus}

@@ -258,6 +258,10 @@ export const useDirectoryData = () => {
     setSortDir('asc');
   };
 
+  const expandToCurrentPath = () => {
+    expandAncestors(currentPathRef.current);
+  };
+
   useEffect(() => {
     currentPathRef.current = currentPath;
   }, [currentPath]);
@@ -354,6 +358,7 @@ export const useDirectoryData = () => {
     loadDirectory,
     handleToggle,
     collapseAll,
+    expandToCurrentPath,
     retryTree
   };
 };
