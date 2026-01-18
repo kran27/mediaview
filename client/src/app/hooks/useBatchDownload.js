@@ -1,7 +1,21 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { fileSave, supported as fileSystemSupported } from 'browser-fs-access';
-import { Zip, ZipPassThrough } from 'fflate';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildFileUrl, fetchList } from '../../lib/api.js';
+
+let zipLibPromise = null;
+const loadZipLib = () => {
+  if (!zipLibPromise) {
+    zipLibPromise = import('fflate');
+  }
+  return zipLibPromise;
+};
+
+let fsAccessPromise = null;
+const loadFsAccess = () => {
+  if (!fsAccessPromise) {
+    fsAccessPromise = import('browser-fs-access');
+  }
+  return fsAccessPromise;
+};
 const PROGRESS_UPDATE_MS = 200;
 const INITIAL_DOWNLOAD_STATE = {
   status: 'idle',
@@ -16,9 +30,7 @@ const INITIAL_DOWNLOAD_STATE = {
   warning: ''
 };
 
-const canUseFileSystemAccess = () => Boolean(fileSystemSupported);
-
-const createZipWriter = async (filename, mode) => {
+const createZipWriter = async (filename, mode, fileSave) => {
   if (mode === 'fileSystem') {
     const handle = await window.showSaveFilePicker({
       suggestedName: filename,
@@ -33,6 +45,9 @@ const createZipWriter = async (filename, mode) => {
     };
   }
 
+  if (typeof fileSave !== 'function') {
+    throw new Error('File save is unavailable in this browser.');
+  }
   const chunks = [];
   return {
     type: 'memory',
@@ -58,6 +73,13 @@ export const useBatchDownload = () => {
 
   const selectedCount = selectedEntries.size;
   const selectedPaths = useMemo(() => new Set(selectedEntries.keys()), [selectedEntries]);
+
+  useEffect(() => {
+    if (selectionMode) {
+      void loadZipLib();
+      void loadFsAccess();
+    }
+  }, [selectionMode]);
 
   const normalizeEntry = useCallback((entry) => ({
     path: entry.path,
@@ -111,9 +133,14 @@ export const useBatchDownload = () => {
     abortRef.current?.abort();
   }, []);
 
-  const getWriterMode = useCallback(() => (
-    canUseFileSystemAccess() ? 'fileSystem' : 'memory'
-  ), []);
+  const getWriterMode = useCallback(async () => {
+    try {
+      const { supported } = await loadFsAccess();
+      return supported ? 'fileSystem' : 'memory';
+    } catch {
+      return 'memory';
+    }
+  }, []);
 
   const getWriterWarning = useCallback((writerMode) => (
     writerMode === 'memory'
@@ -197,7 +224,7 @@ export const useBatchDownload = () => {
       || downloadState.status === 'downloading'
       || downloadState.status === 'finalizing') return null;
 
-    const writerMode = getWriterMode();
+    const writerMode = await getWriterMode();
     const controller = new AbortController();
     abortRef.current = controller;
 
@@ -268,7 +295,7 @@ export const useBatchDownload = () => {
       || downloadState.status === 'downloading'
       || downloadState.status === 'finalizing') return;
 
-    const writerMode = prepared?.writerMode || getWriterMode();
+    const writerMode = prepared?.writerMode || await getWriterMode();
     const controller = new AbortController();
     abortRef.current = controller;
     progressRef.current = { bytes: 0, lastUpdate: 0 };
@@ -322,7 +349,19 @@ export const useBatchDownload = () => {
       }
 
       const suggestedName = `archive-${new Date().toISOString().slice(0, 10)}.zip`;
-      writer = await createZipWriter(suggestedName, writerMode);
+      let fileSave = null;
+      try {
+        ({ fileSave } = await loadFsAccess());
+      } catch (error) {
+        setDownloadState((prev) => ({
+          ...prev,
+          status: 'error',
+          error: error.message || 'Failed to prepare file download.'
+        }));
+        return;
+      }
+      writer = await createZipWriter(suggestedName, writerMode, fileSave);
+      const { Zip, ZipPassThrough } = await loadZipLib();
 
       let writeChain = Promise.resolve();
       let finalizeResolve;

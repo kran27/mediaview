@@ -1,6 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import snarkdown from 'snarkdown';
-import xss from 'xss';
 import { buildFileUrl } from '../../lib/api.js';
 import { formatSize } from '../../lib/format.js';
 import {
@@ -69,7 +67,19 @@ const AUDIO_MIME_TYPES = {
   '.aiff': 'audio/aiff'
 };
 
-const renderMarkdown = (value) => xss(snarkdown(value));
+let markdownLibPromise = null;
+const loadMarkdownLibs = () => {
+  if (!markdownLibPromise) {
+    markdownLibPromise = Promise.all([
+      import('snarkdown'),
+      import('xss')
+    ]).then(([snarkdownModule, xssModule]) => ({
+      snarkdown: snarkdownModule.default || snarkdownModule,
+      xss: xssModule.default || xssModule
+    }));
+  }
+  return markdownLibPromise;
+};
 
 const videoSupportCache = new Map();
 const isVideoPlayable = (entry) => {
@@ -296,10 +306,16 @@ const Lightbox = ({
         }
         const content = await response.text();
         if (!isActive) return;
+        let html = '';
+        if (isMarkdown) {
+          const { snarkdown, xss } = await loadMarkdownLibs();
+          if (!isActive) return;
+          html = xss(snarkdown(content));
+        }
         setTextPreview({
           status: 'ready',
           content,
-          html: isMarkdown ? renderMarkdown(content) : '',
+          html,
           truncated: false,
           error: '',
           retryable: false
@@ -322,6 +338,12 @@ const Lightbox = ({
       isActive = false;
     };
   }, [open, selectedEntry, shouldGateLargeFile, canPreviewText, isText, isMarkdown, textRetryToken]);
+
+  useEffect(() => {
+    if (open && isMarkdown) {
+      void loadMarkdownLibs();
+    }
+  }, [open, isMarkdown]);
 
   useEffect(() => {
     if (!open) return undefined;
