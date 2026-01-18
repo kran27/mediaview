@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { ROOT_NAME } from '../config.js';
 import { getDirectoryEntries, hasDirectoryEntry } from '../lib/hash-cache.js';
-import { isExcludedPath } from '../lib/exclude.js';
+import { isExcludedPath, isHiddenPath } from '../lib/exclude.js';
 import { decodePathSegments, sanitizeRequestPath } from '../lib/paths.js';
 import { buildStats } from '../lib/stats.js';
 
@@ -23,7 +23,7 @@ export const registerListRoute = (app) => {
     let requestPath;
     try {
       requestPath = sanitizeRequestPath(getRequestPath(req));
-      if (isExcludedPath(requestPath)) {
+      if (isExcludedPath(requestPath) || isHiddenPath(requestPath)) {
         res.status(404).json({ error: 'Not found' });
         return;
       }
@@ -32,7 +32,7 @@ export const registerListRoute = (app) => {
       return;
     }
 
-    if (!hasDirectoryEntry(requestPath)) {
+    if (!hasDirectoryEntry(requestPath) || getDirectoryEntries(requestPath) === null) {
       res.status(404).json({ error: 'Not found' });
       return;
     }

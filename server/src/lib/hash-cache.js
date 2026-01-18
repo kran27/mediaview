@@ -4,11 +4,12 @@ import path from 'node:path';
 import { Worker } from 'node:worker_threads';
 import {
   CACHE_ROOT,
-  EXCLUDE_PATTERNS,
+  EXCLUDED_PATTERNS,
   HASH_CACHE_SCAN_INTERVAL_MS,
   ROOT_DIR,
   ROOT_NAME,
 } from '../config.js';
+import { isHiddenPath } from './exclude.js';
 import { classifyFile } from './classify.js';
 
 export const HASH_CACHE_DIR = CACHE_ROOT;
@@ -368,7 +369,7 @@ export const getDirectoryEntries = (relativePath) => {
   const entries = [];
   children.forEach((childPath) => {
     const entry = ENTRY_INDEX.get(childPath);
-    if (entry) entries.push(entry);
+    if (entry && !isHiddenPath(childPath)) entries.push(entry);
   });
   entries.sort((a, b) => {
     if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
@@ -379,26 +380,14 @@ export const getDirectoryEntries = (relativePath) => {
 
 export const getDirectoryTree = () => {
   const nodes = {};
-  const pending = [''];
-  while (pending.length > 0) {
-    const current = pending.pop();
-    const entry = ENTRY_INDEX.get(current) || {
-      name: current ? path.basename(current) : ROOT_NAME,
-      path: current,
+  for (const [pathValue, entry] of ENTRY_INDEX.entries()) {
+    if (!entry?.isDir) continue;
+    if (isHiddenPath(pathValue)) continue;
+    nodes[pathValue] = {
+      name: entry.name || (pathValue ? path.basename(pathValue) : ROOT_NAME),
+      path: pathValue,
+      parent: getParentPath(pathValue),
     };
-    const children = DIR_CHILDREN.get(current);
-    const dirChildren = children
-      ? [...children].filter((childPath) => ENTRY_INDEX.get(childPath)?.isDir)
-      : [];
-    dirChildren.sort((a, b) =>
-      path.basename(a).localeCompare(path.basename(b), undefined, { sensitivity: 'base' })
-    );
-    nodes[current] = {
-      name: entry.name,
-      path: current,
-      children: dirChildren,
-    };
-    dirChildren.forEach((childPath) => pending.push(childPath));
   }
   return nodes;
 };
@@ -425,7 +414,7 @@ export const startHashCacheWorker = async () => {
       workerData: {
         rootDir: ROOT_DIR,
         cacheFile: HASH_CACHE_FILE,
-        excludePatterns: EXCLUDE_PATTERNS,
+        excludedPatterns: EXCLUDED_PATTERNS,
         scanIntervalMs: HASH_CACHE_SCAN_INTERVAL_MS,
         initialEntries: serialized ? serialized.entries : null,
         initialEntriesLoaded: shouldShareInitialEntries,
@@ -566,7 +555,7 @@ export const searchHashCache = async (query) => {
   let scanned = 0;
 
   for (const [pathValue, nameLower] of NAME_INDEX.entries()) {
-    if (!pathValue) {
+    if (!pathValue || isHiddenPath(pathValue)) {
       continue;
     }
     scanned += 1;

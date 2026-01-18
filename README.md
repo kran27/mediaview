@@ -56,6 +56,19 @@ npm run dev
 
 The UI runs on `http://localhost:5173` and proxies `/api` to the backend on port `3001`.
 
+## Excluded vs hidden entries
+
+Use excluded patterns to block entries entirely (list, tree, search, file, thumbnail). Hidden patterns
+only remove entries from list, tree, and search, but still allow direct file access by path.
+
+Set these as environment variables (comma-separated):
+
+- `EXCLUDED_PATTERNS`: entries to block across all endpoints (default: `.DS_Store,_h5ai`).
+- `HIDDEN_PATTERNS`: entries to hide from list/tree/search only (default: `unlisted_`).
+
+Patterns match any path segment that starts with the configured value, for example `unlisted` will
+match `/folder-1/unlisted/file.jpg` and `/folder-2/unlisted_img.jpg`.
+
 ## Production build
 
 1. Build the client:

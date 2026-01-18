@@ -2,7 +2,7 @@ import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import { ROOT_DIR } from '../config.js';
 import { classifyFile } from './classify.js';
-import { isExcludedPath } from './exclude.js';
+import { isExcludedPath, isHiddenPath } from './exclude.js';
 import { resolveSafePath, toPosix } from './paths.js';
 
 export const readDirectory = async (relativePath) => {
@@ -13,7 +13,7 @@ export const readDirectory = async (relativePath) => {
     dirEntries.map(async (dirent) => {
       const entryPath = path.join(absolutePath, dirent.name);
       const relativeEntryPath = toPosix(path.relative(ROOT_DIR, entryPath));
-      if (isExcludedPath(relativeEntryPath)) {
+      if (isExcludedPath(relativeEntryPath) || isHiddenPath(relativeEntryPath)) {
         return null;
       }
       const entryStats = await fsPromises.stat(entryPath);

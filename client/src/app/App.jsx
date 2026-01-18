@@ -178,9 +178,11 @@ export default function App() {
     retryTree?.();
     void loadDirectory(currentPath, { force: true });
   };
-  const showConnectionLightbox = (status.error || treeStatus.error)
+  const showConnectionLightbox = (
+    ((status.error && status.retryable) || (treeStatus.error && treeStatus.retryable))
     && !status.loading
-    && !treeStatus.loading;
+    && !treeStatus.loading
+  );
 
   useUrlSync({
     clearSearch: handleClearSearch,
@@ -233,7 +235,7 @@ export default function App() {
             onToggle={handleToggle}
             onCollapseAll={collapseAll}
             onNavigate={handleNavigate}
-            hideHeader={Boolean(status.error)}
+            hideHeader={false}
             status={treeStatus}
             onRetry={retryTree}
           />

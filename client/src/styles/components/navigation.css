@@ -110,9 +110,6 @@
 
 .crumb.current {
   color: var(--accent);
-}
-
-.crumb.current {
   cursor: pointer;
 }
 

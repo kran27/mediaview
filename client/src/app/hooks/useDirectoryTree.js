@@ -17,16 +17,30 @@ export const useDirectoryTree = () => {
     if (!nodes) return;
     setTree((prev) => {
       const next = { ...prev };
-      Object.values(nodes).forEach((node) => {
-        if (!node) return;
+      const entries = Object.values(nodes).filter(Boolean);
+      const childIndex = new Map();
+
+      entries.forEach((node) => {
+        const parent = node.parent ?? '';
+        if (!node.path || node.path === '') return;
+        if (!childIndex.has(parent)) childIndex.set(parent, []);
+        childIndex.get(parent).push(node.path);
+      });
+
+      entries.forEach((node) => {
         const prevNode = next[node.path];
+        const children = childIndex.get(node.path) || [];
+        children.sort((a, b) =>
+          getBasename(a).localeCompare(getBasename(b), undefined, { sensitivity: 'base' })
+        );
         next[node.path] = {
           path: node.path,
           name: node.name || prevNode?.name || (node.path ? getBasename(node.path) : 'Archive'),
-          children: Array.isArray(node.children) ? node.children : [],
+          children,
           expanded: prevNode?.expanded ?? node.path === ''
         };
       });
+
       return next;
     });
   };

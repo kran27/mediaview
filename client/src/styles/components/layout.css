@@ -15,6 +15,9 @@
   --thumb-ratio: 3 / 2;
   --folder-thumb: 64px;
   --folder-card-ratio: 4 / 1;
+  --list-size-col-min: 90px;
+  --list-size-col-max: 120px;
+  --list-thumb-size: 32px;
 }
 
 .layout > .panel + .panel {
@@ -55,5 +58,15 @@
   .tree-panel,
   .list-panel {
     order: 1;
+  }
+}
+
+@media (max-width: 720px) {
+  .layout {
+    --folder-thumb: 48px;
+    --folder-card-ratio: 6 / 1;
+    --list-size-col-min: 70px;
+    --list-size-col-max: 96px;
+    --list-thumb-size: 28px;
   }
 }

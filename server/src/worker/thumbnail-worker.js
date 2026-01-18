@@ -4,10 +4,10 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { parentPort, workerData } from 'node:worker_threads';
 import sharp from 'sharp';
-import { minimatch } from 'minimatch';
 import { IMAGE_EXTS, THUMB_VIDEO_EXTS } from '../lib/classify.js';
+import { isExcludedPathWithPatterns } from '../lib/exclude.js';
 
-const { rootDir, thumbDir, excludePatterns, sizes, thumbExt } = workerData;
+const { rootDir, thumbDir, excludedPatterns, sizes, thumbExt } = workerData;
 const sizeEntries = Object.entries(sizes);
 const pending = new Set();
 const queue = [];
@@ -26,25 +26,8 @@ const getThumbHeight = (width) => Math.round((width * THUMB_ASPECT.height) / THU
 
 const toPosix = (value) => value.split(path.sep).join('/');
 
-const isExcludedPath = (relativePath) => {
-  if (!relativePath) return false;
-  const posixPath = toPosix(relativePath);
-  if (
-    posixPath === '.thumbnail' ||
-    posixPath.startsWith('.thumbnail/') ||
-    posixPath === '.cache' ||
-    posixPath.startsWith('.cache/')
-  ) {
-    return true;
-  }
-  if (!excludePatterns || excludePatterns.length === 0) return false;
-  const candidates = new Set([posixPath, posixPath.replace(/\/+$/, ''), `${posixPath}/`]);
-  return excludePatterns.some((pattern) =>
-    [...candidates].some((candidate) =>
-      minimatch(candidate, pattern, { dot: true, matchBase: true })
-    )
-  );
-};
+const isExcludedPath = (relativePath) =>
+  isExcludedPathWithPatterns(relativePath, excludedPatterns);
 
 const ensureThumbDir = async () => {
   await fsPromises.mkdir(thumbDir, { recursive: true });

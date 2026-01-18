@@ -23,6 +23,7 @@ const DirectoryPanel = ({
   onRetryList
 }) => {
   const hasError = Boolean(status.error);
+  const isNotFound = status?.code === 404;
   const isSearchActive = Boolean(searchQuery);
   const searchCount = searchResults?.length || 0;
   const searchLoading = isSearchActive && searchStatus?.loading;
@@ -30,7 +31,9 @@ const DirectoryPanel = ({
   const isRoot = !currentPath;
   const titleText = isSearchActive
     ? 'Search results'
-    : (hasError ? '' : (isRoot ? rootLabel : (directory?.current?.name || currentPathName || rootLabel)));
+    : isNotFound
+      ? 'Not found'
+      : (hasError ? '' : (isRoot ? rootLabel : (directory?.current?.name || currentPathName || rootLabel)));
   const searchResultLabel = `${searchCount} result${searchCount === 1 ? '' : 's'} for "${searchQuery}"`;
   const subLabel = isSearchActive
     ? (

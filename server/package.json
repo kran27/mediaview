@@ -19,7 +19,6 @@
     "express": "^5.2.1",
     "helmet": "^7.2.0",
     "mime-types": "^3.0.2",
-    "minimatch": "^10.1.1",
     "sharp": "^0.34.5"
   },
   "devDependencies": {

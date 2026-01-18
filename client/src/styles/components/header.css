@@ -89,7 +89,7 @@
   margin: 0;
   border: 1px solid var(--border);
   background: var(--panel-2);
-  border-radius: 6px;
+  border-radius: 8px;
   overflow: hidden;
   height: var(--control-height);
 }

@@ -1,0 +1,52 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Server: dev (combined)",
+      "cwd": "${workspaceFolder}/server",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "--watch",
+        "index.js",
+        "combined"
+      ],
+      "env": {
+        "ARCHIVE_ROOT": "${workspaceFolder}/../mediaview-content",
+        "CACHE_ROOT": "${workspaceFolder}/../mediaview-cache"
+      },
+      "skipFiles": [
+        "<node_internals>/**"
+      ]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Client: Vite dev server",
+      "cwd": "${workspaceFolder}/client",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "serverReadyAction": {
+        "pattern": "Local:\\s+(http://\\S+)",
+        "uriFormat": "%s",
+        "action": "debugWithEdge"
+      }
+    }
+  ],
+  "compounds": [
+    {
+      "name": "▶️ Full stack",
+      "configurations": [
+        "Server: dev (combined)",
+        "Client: Vite dev server"
+      ]
+    }
+  ]
+}

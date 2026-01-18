@@ -493,6 +493,16 @@
   color: rgba(255, 255, 255, 0.55);
 }
 
+.lightbox-location-icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.lightbox-location-icon .icon {
+  font-size: 12px;
+  line-height: 1;
+}
+
 .lightbox-path {
   border: none;
   background: none;
@@ -541,12 +551,6 @@
   font-size: 12px;
   background: rgba(255, 255, 255, 0.06);
   text-decoration: none;
-}
-
-.lightbox-download {
-  border-color: rgba(255, 255, 255, 0.18);
-  color: rgba(255, 255, 255, 0.75);
-  background: rgba(255, 255, 255, 0.04);
 }
 
 .lightbox-size,

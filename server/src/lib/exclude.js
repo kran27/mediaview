@@ -1,23 +1,21 @@
-import { minimatch } from 'minimatch';
-import { EXCLUDE_PATTERNS } from '../config.js';
+import { EXCLUDED_PATTERNS, HIDDEN_PATTERNS } from '../config.js';
 import { toPosix } from './paths.js';
 
-export const isExcludedPath = (relativePath) => {
+export const isExcludedPathWithPatterns = (relativePath, patterns) => {
   if (!relativePath) return false;
   const posixPath = toPosix(relativePath);
-  if (
-    posixPath === '.thumbnail' ||
-    posixPath.startsWith('.thumbnail/') ||
-    posixPath === '.cache' ||
-    posixPath.startsWith('.cache/')
-  ) {
-    return true;
-  }
-  if (EXCLUDE_PATTERNS.length === 0) return false;
-  const candidates = new Set([posixPath, posixPath.replace(/\/+$/, ''), `${posixPath}/`]);
-  return EXCLUDE_PATTERNS.some((pattern) =>
-    [...candidates].some((candidate) =>
-      minimatch(candidate, pattern, { dot: true, matchBase: true })
-    )
-  );
+  if (!patterns || patterns.length === 0) return false;
+  const normalizedPath = posixPath.replace(/\/+$/, '');
+  const segments = normalizedPath.split('/').filter(Boolean);
+  return patterns.some((pattern) => {
+    const normalizedPattern = toPosix(pattern).replace(/\/+$/, '');
+    if (!normalizedPattern) return false;
+    return segments.some((segment) => segment.startsWith(normalizedPattern));
+  });
 };
+
+export const isExcludedPath = (relativePath) =>
+  isExcludedPathWithPatterns(relativePath, EXCLUDED_PATTERNS);
+
+export const isHiddenPath = (relativePath) =>
+  isExcludedPathWithPatterns(relativePath, HIDDEN_PATTERNS);

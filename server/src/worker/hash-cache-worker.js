@@ -3,12 +3,12 @@ import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { parentPort, workerData } from 'node:worker_threads';
-import { minimatch } from 'minimatch';
+import { isExcludedPathWithPatterns } from '../lib/exclude.js';
 
 const {
   rootDir,
   cacheFile,
-  excludePatterns,
+  excludedPatterns,
   scanIntervalMs,
   initialEntries,
   initialEntriesLoaded,
@@ -37,17 +37,8 @@ const cacheRelativeDir =
     ? path.posix.dirname(cacheRelativePath)
     : null;
 
-const isExcludedPath = (relativePath) => {
-  if (!relativePath) return false;
-  const posixPath = toPosix(relativePath);
-  if (!excludePatterns || excludePatterns.length === 0) return false;
-  const candidates = new Set([posixPath, posixPath.replace(/\/+$/, ''), `${posixPath}/`]);
-  return excludePatterns.some((pattern) =>
-    [...candidates].some((candidate) =>
-      minimatch(candidate, pattern, { dot: true, matchBase: true })
-    )
-  );
-};
+const isExcludedPath = (relativePath) =>
+  isExcludedPathWithPatterns(relativePath, excludedPatterns);
 
 const hashFile = async (absolutePath) => {
   const handle = await fsPromises.open(absolutePath, 'r');

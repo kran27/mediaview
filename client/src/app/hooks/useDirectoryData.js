@@ -49,7 +49,12 @@ export const useDirectoryData = () => {
   });
   const [sortKey, setSortKey] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
-  const [status, setStatus] = useState({ loading: true, error: null, retryable: false });
+  const [status, setStatus] = useState({
+    loading: true,
+    error: null,
+    retryable: false,
+    code: null
+  });
   const {
     tree,
     treeStatus,
@@ -118,7 +123,7 @@ export const useDirectoryData = () => {
       setPendingSelection('');
     }
     expandAncestors(pathValue, data.root?.name || 'Archive');
-    setStatus({ loading: false, error: null, retryable: false });
+    setStatus({ loading: false, error: null, retryable: false, code: null });
   };
 
   const loadDirectory = async (pathValue, options = {}) => {
@@ -141,12 +146,13 @@ export const useDirectoryData = () => {
         setLastGoodPathValue(pathValue);
       }
       applyDirectoryState(cached, pathValue, selection, selectPath, preserveSelection);
+      prefetchMissingChildren(cached.entries);
       if (pathValue) {
         void hydratePathChain(pathValue);
       }
       return { selection, shouldLightbox };
     }
-    setStatus({ loading: true, error: null, retryable: false });
+    setStatus({ loading: true, error: null, retryable: false, code: null });
     setCurrentPath(pathValue);
     if (pathValue && treeHydratedRef.current) {
       expandAncestors(pathValue, tree['']?.name || 'Archive');
@@ -164,6 +170,7 @@ export const useDirectoryData = () => {
         setLastGoodPathValue(pathValue);
       }
       applyDirectoryState(data, pathValue, selection, selectPath, preserveSelection);
+      prefetchMissingChildren(data.entries);
       return { selection, shouldLightbox };
     } catch (error) {
       const fallbackPath = getLastResolvablePath(pathValue);
@@ -178,13 +185,15 @@ export const useDirectoryData = () => {
       setStatus({
         loading: false,
         error: error.message,
-        retryable: Boolean(error.retryable)
+        retryable: Boolean(error.retryable),
+        code: Number.isFinite(error?.status) ? error.status : null
       });
       return { selection: null, shouldLightbox: false };
     }
   };
 
-  const loadChildren = async (pathValue) => {
+  const loadChildren = async (pathValue, options = {}) => {
+    const { silent = false } = options;
     try {
       const data = await fetchList(pathValue, {
         background: true,
@@ -198,17 +207,37 @@ export const useDirectoryData = () => {
       });
       applyListing(pathValue, data, { expand: false });
     } catch (error) {
+      if (silent) return;
       setStatus({
         loading: false,
         error: error.message,
-        retryable: Boolean(error.retryable)
+        retryable: Boolean(error.retryable),
+        code: Number.isFinite(error?.status) ? error.status : null
       });
     }
+  };
+
+  const prefetchMissingChildren = (entries) => {
+    if (!Array.isArray(entries)) return;
+    entries
+      .filter((entry) => entry?.isDir)
+      .map((entry) => entry.path)
+      .filter((childPath) => childPath && !getCachedListing(childPath))
+      .forEach((childPath) => {
+        void loadChildren(childPath, { silent: true });
+      });
   };
 
   const handleToggle = (pathValue) => {
     const node = tree[pathValue];
     if (!node) return;
+    if (!node.expanded && Array.isArray(node.children)) {
+      node.children
+        .filter((childPath) => !getCachedListing(childPath))
+        .forEach((childPath) => {
+          void loadChildren(childPath, { silent: true });
+        });
+    }
     if (
       !node.expanded &&
       node.children === null &&

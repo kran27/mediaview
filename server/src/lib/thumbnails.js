@@ -3,7 +3,7 @@ import fsPromises from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { Worker } from 'node:worker_threads';
-import { EXCLUDE_PATTERNS, ROOT_DIR, THUMB_DIR, THUMB_EXT, THUMB_SIZES } from '../config.js';
+import { EXCLUDED_PATTERNS, ROOT_DIR, THUMB_DIR, THUMB_EXT, THUMB_SIZES } from '../config.js';
 import { isThumbablePath } from './classify.js';
 import {
   THUMB_ERR_LIMIT,
@@ -159,7 +159,7 @@ export const startThumbnailWorker = async () => {
         workerData: {
           rootDir: ROOT_DIR,
           thumbDir: THUMB_DIR,
-          excludePatterns: EXCLUDE_PATTERNS,
+          excludedPatterns: EXCLUDED_PATTERNS,
           sizes: THUMB_SIZES,
           thumbExt: THUMB_EXT,
         },

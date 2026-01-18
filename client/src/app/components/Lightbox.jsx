@@ -12,7 +12,7 @@ import {
   isVideoEntry,
   isViewableEntry
 } from '../../lib/fileTypes.js';
-import { iconForEntry } from './index.js';
+import { IconFolder, iconForEntry } from './index.js';
 
 const LARGE_FILE_THRESHOLD_BYTES = 10 * 1024 * 1024;
 const TEXT_PREVIEW_MAX_BYTES = 5 * 1024 * 1024;
@@ -553,7 +553,9 @@ const Lightbox = ({
               </div>
               {showPath && pathValue && (
                 <div className="lightbox-meta-path">
-                  <span>Location: </span>
+                  <span className="lightbox-location-icon" aria-hidden="true">
+                    <IconFolder />
+                  </span>
                   <button
                     type="button"
                     className="lightbox-path"
