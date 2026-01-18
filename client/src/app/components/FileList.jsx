@@ -1,8 +1,7 @@
 import { useEffect, useRef } from 'react';
-import '../../styles/components/media-list.css';
 import { buildThumbUrl } from '../../lib/api.js';
 import { formatSize } from '../../lib/format.js';
-import { iconForEntry } from './index.js';
+import { IconCheckCircleFill, iconForEntry } from './index.js';
 
 const LIST_THUMB_SIZES = '32px';
 const THUMB_WIDTHS = { sm: 200, md: 400, lg: 600 };
@@ -35,8 +34,6 @@ const renderThumbStack = ({
       src={buildThumbUrl(entry.path, 'sm')}
       srcSet={buildThumbSrcSet(entry.path)}
       sizes={sizes}
-      loading="lazy"
-      alt=""
       onLoad={handleThumbLoad}
       onError={handleThumbError}
     />
@@ -49,9 +46,69 @@ const FileList = ({
   viewMode,
   onSelect,
   selectedPath,
-  onHighlight
+  selectionMode,
+  selectedPaths,
+  onToggleSelection,
+  onOpenContextMenu
 }) => {
   const containerRef = useRef(null);
+  const longPressTimerRef = useRef(null);
+  const longPressFiredRef = useRef(false);
+
+  const handleActivate = (entry) => {
+    if (selectionMode && onToggleSelection) {
+      onToggleSelection(entry);
+      return;
+    }
+    onSelect(entry);
+  };
+
+  const clearLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const openContextMenuAt = (entry, position) => {
+    if (!onOpenContextMenu) return;
+    if (selectionMode) {
+      onOpenContextMenu(null, position, 'selection');
+      return;
+    }
+    onOpenContextMenu(entry, position, 'entry');
+  };
+
+  const handlePointerDown = (entry, event) => {
+    if (!onOpenContextMenu) return;
+    if (event.pointerType === 'mouse') return;
+    clearLongPress();
+    longPressFiredRef.current = false;
+    const { clientX, clientY } = event;
+    longPressTimerRef.current = setTimeout(() => {
+      openContextMenuAt(entry, { x: clientX, y: clientY });
+      longPressFiredRef.current = true;
+      clearLongPress();
+    }, 500);
+  };
+
+  const handlePointerUp = () => {
+    clearLongPress();
+  };
+
+  const handleContextMenu = (entry, event) => {
+    if (!onOpenContextMenu) return;
+    event.preventDefault();
+    openContextMenuAt(entry, { x: event.clientX, y: event.clientY });
+  };
+
+  const handleClick = (entry) => {
+    if (longPressFiredRef.current) {
+      longPressFiredRef.current = false;
+      return;
+    }
+    handleActivate(entry);
+  };
 
   useEffect(() => {
     if (!selectedPath) return;
@@ -89,22 +146,30 @@ const FileList = ({
           <div className="grid grid-folders">
             {folders.map((entry, index) => {
               const isSelected = entry.path === selectedPath;
+              const isBatchSelected = selectedPaths?.has(entry.path);
               return (
                 <button
                   type="button"
                   key={entry.path}
                   data-path={entry.path}
-                  className={`grid-card grid-folder-card ${isSelected ? 'selected' : ''}`}
-                  onClick={() => onSelect(entry)}
-                  onContextMenu={(event) => {
-                    if (!onHighlight) return;
-                    event.preventDefault();
-                    onHighlight(entry);
-                  }}
+                  className={`grid-card grid-folder-card ${isSelected ? 'selected' : ''} ${isBatchSelected ? 'is-selected' : ''}`}
+                  onClick={() => handleClick(entry)}
+                  onPointerDown={(event) => handlePointerDown(entry, event)}
+                  onPointerUp={handlePointerUp}
+                  onPointerCancel={handlePointerUp}
+                  onContextMenu={(event) => handleContextMenu(entry, event)}
+                  aria-pressed={selectionMode ? isBatchSelected : undefined}
                   style={{ '--index': index }}
                 >
                   <div className="grid-folder-thumb">
                     <div className="thumb-icon">{iconForEntry(entry)}</div>
+                    {isBatchSelected && (
+                      <div className="selection-overlay" aria-hidden="true">
+                        <span className="selection-icon">
+                          <IconCheckCircleFill />
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <div className="grid-folder-label">
                     <span>{entry.name}</span>
@@ -118,19 +183,20 @@ const FileList = ({
         <div className="grid grid-files">
           {files.map((entry, index) => {
             const isSelected = entry.path === selectedPath;
+            const isBatchSelected = selectedPaths?.has(entry.path);
             const hasPreview = entry.type === 'image' || entry.type === 'video';
             return (
               <button
                 type="button"
                 key={entry.path}
                 data-path={entry.path}
-                className={`grid-card ${isSelected ? 'selected' : ''}`}
-                onClick={() => onSelect(entry)}
-                onContextMenu={(event) => {
-                  if (!onHighlight) return;
-                  event.preventDefault();
-                  onHighlight(entry);
-                }}
+                className={`grid-card ${isSelected ? 'selected' : ''} ${isBatchSelected ? 'is-selected' : ''}`}
+                onClick={() => handleClick(entry)}
+                onPointerDown={(event) => handlePointerDown(entry, event)}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerUp}
+                onContextMenu={(event) => handleContextMenu(entry, event)}
+                aria-pressed={selectionMode ? isBatchSelected : undefined}
                 style={{ '--index': index }}
               >
                 <div className="thumb">
@@ -144,6 +210,13 @@ const FileList = ({
                   })}
                   {!hasPreview && (
                     <div className="thumb-icon">{iconForEntry(entry)}</div>
+                  )}
+                  {isBatchSelected && (
+                    <div className="selection-overlay" aria-hidden="true">
+                      <span className="selection-icon">
+                        <IconCheckCircleFill />
+                      </span>
+                    </div>
                   )}
                 </div>
                 <div className="grid-label">
@@ -167,19 +240,20 @@ const FileList = ({
       <div className="list-body" ref={containerRef}>
         {entries.map((entry, index) => {
           const isSelected = entry.path === selectedPath;
+          const isBatchSelected = selectedPaths?.has(entry.path);
           const hasPreview = entry.type === 'image' || entry.type === 'video';
           return (
             <button
               type="button"
               key={entry.path}
               data-path={entry.path}
-              className={`list-row ${isSelected ? 'selected' : ''} ${entry.isDir ? 'is-dir' : ''}`}
-              onClick={() => onSelect(entry)}
-              onContextMenu={(event) => {
-                if (!onHighlight) return;
-                event.preventDefault();
-                onHighlight(entry);
-              }}
+              className={`list-row ${isSelected ? 'selected' : ''} ${isBatchSelected ? 'is-selected' : ''} ${entry.isDir ? 'is-dir' : ''}`}
+              onClick={() => handleClick(entry)}
+              onPointerDown={(event) => handlePointerDown(entry, event)}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerUp}
+              onContextMenu={(event) => handleContextMenu(entry, event)}
+              aria-pressed={selectionMode ? isBatchSelected : undefined}
               style={{ '--index': index }}
             >
               <span className="list-cell name">
@@ -193,6 +267,13 @@ const FileList = ({
                     iconTag: 'span'
                   })}
                   {!hasPreview && iconForEntry(entry)}
+                  {isBatchSelected && (
+                    <span className="selection-overlay" aria-hidden="true">
+                      <span className="selection-icon">
+                        <IconCheckCircleFill />
+                      </span>
+                    </span>
+                  )}
                 </span>
                 {entry.name}
               </span>

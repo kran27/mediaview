@@ -11,7 +11,9 @@
   gap: 0;
   align-items: stretch;
   background: var(--panel);
-  min-height: calc(100vh - var(--topbar-height));
+  min-height: calc(100vh - var(--topbar-height) - var(--breadcrumbs-height));
+  overflow: hidden;
+  --tree-panel-width: 260px;
   --thumb-ratio: 3 / 2;
   --folder-thumb: 64px;
   --folder-card-ratio: 4 / 1;
@@ -44,6 +46,7 @@
   .layout {
     grid-template-columns: 1fr;
     min-height: calc(100vh - var(--topbar-height) - var(--breadcrumbs-height));
+    --tree-panel-width: 0px;
   }
 
   .layout > .panel + .panel {
@@ -58,6 +61,16 @@
   .tree-panel,
   .list-panel {
     order: 1;
+  }
+}
+
+@supports (height: 100dvh) {
+  .page {
+    min-height: 100dvh;
+  }
+
+  .layout {
+    min-height: calc(100dvh - var(--topbar-height) - var(--breadcrumbs-height));
   }
 }
 

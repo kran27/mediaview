@@ -19,6 +19,28 @@ export const buildThumbUrl = (pathValue, size = 'sm') => {
   return `${API_BASE}/api/thumbnail/${size}/${encodedPath}`;
 };
 
+export const buildListUrl = (pathValue = '') => {
+  const encodedPath = encodePathSegments(pathValue);
+  return encodedPath ? `${API_BASE}/api/list/${encodedPath}` : `${API_BASE}/api/list`;
+};
+
+export const fetchList = async (pathValue = '', options = {}) => {
+  const { signal } = options;
+  const url = buildListUrl(pathValue);
+  try {
+    const response = await fetch(url, { signal });
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw createRequestError('Requested content could not be found.', response.status);
+      }
+      throw createRequestError(`Failed to load ${pathValue || 'root'}`, response.status);
+    }
+    return response.json();
+  } catch (error) {
+    throw normalizeRequestError(error, `Failed to load ${pathValue || 'root'}`);
+  }
+};
+
 export const searchArchive = async (query) => {
   const params = new URLSearchParams();
   if (query) {

@@ -8,6 +8,7 @@
   background: var(--panel-2);
   border-bottom: 1px solid var(--border);
   --control-height: 36px;
+  min-height: var(--topbar-height);
 }
 
 .brand {

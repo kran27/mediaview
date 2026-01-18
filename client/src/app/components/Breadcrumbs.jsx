@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import '../../styles/components/navigation.css';
 import { IconDatabase } from './index.js';
 
 const Breadcrumbs = ({ path, onNavigate, searchQuery }) => {
@@ -40,10 +39,10 @@ const Breadcrumbs = ({ path, onNavigate, searchQuery }) => {
           className={`crumb is-home ${isRootCurrent ? 'current' : ''}`}
           type="button"
           onClick={() => onNavigate('')}
-          aria-label="Home"
+          aria-label="Archive"
         >
           <IconDatabase />
-          <span className="crumb-label">Home</span>
+          <span className="crumb-label">Archive</span>
         </button>
         {isSearchActive && (
           <span className="crumb-segment">

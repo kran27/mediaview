@@ -1,4 +1,3 @@
-import './TreePanel.css';
 import {
   IconArrowsExpand,
   IconChevronRight,

@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "bootstrap-icons": "^1.13.1",
+    "browser-fs-access": "^0.38.0",
+    "fflate": "^0.8.2",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "snarkdown": "^2.0.0",

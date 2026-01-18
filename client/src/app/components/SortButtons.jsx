@@ -1,4 +1,3 @@
-import '../../styles/components/toolbar.css';
 
 const SortButtons = ({ sortKey, sortDir, onSortClick }) => (
   <div className="panel-sort">

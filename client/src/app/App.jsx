@@ -1,10 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
+import '../styles/components/animations.css';
+import '../styles/components/context-menu.css';
+import '../styles/components/footer.css';
+import '../styles/components/header.css';
+import '../styles/components/icons.css';
 import '../styles/components/layout.css';
 import '../styles/components/lightbox.css';
+import '../styles/components/media-list.css';
 import '../styles/components/navigation.css';
-import '../styles/components/header.css';
-import '../styles/components/footer.css';
-import '../styles/components/animations.css';
+import '../styles/components/panel.css';
+import '../styles/components/toolbar.css';
+import '../styles/components/TreePanel.css';
+import '../styles/components/ViewToggle.css';
 import {
   AppFooter,
   AppHeader,
@@ -17,6 +24,7 @@ import {
 import { getBasename } from '../lib/format.js';
 import { setUrlState } from '../lib/urlState.js';
 import { useDirectoryData } from './hooks/useDirectoryData.js';
+import { useBatchDownload } from './hooks/useBatchDownload.js';
 import { useLightboxState } from './hooks/useLightboxState.js';
 import { useResponsiveTree } from './hooks/useResponsiveTree.js';
 import { useUrlSync } from './hooks/useUrlSync.js';
@@ -52,6 +60,31 @@ export default function App() {
     lastGoodPath,
     retryTree
   } = useDirectoryData();
+  const {
+    selectionMode,
+    selectedPaths,
+    selectedCount,
+    setSelectionMode,
+    toggleSelection,
+    setSelectionEntries,
+    clearSelection,
+    discoverSelection,
+    downloadSelection,
+    cancelDownload,
+    resetDownloadState,
+    downloadState
+  } = useBatchDownload();
+  const [contextMenu, setContextMenu] = useState({
+    open: false,
+    x: 0,
+    y: 0,
+    entry: null,
+    type: 'entry'
+  });
+  const [downloadPrompt, setDownloadPrompt] = useState({
+    open: false,
+    summary: null
+  });
   const [lastBrowsePath, setLastBrowsePath] = useState('');
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const searchHeaderRef = useRef(null);
@@ -59,7 +92,7 @@ export default function App() {
   const isSearchMode = Boolean(searchQuery);
   const searchStateRef = useRef({ searchQuery: '', searchInput: '' });
 
-  const rootLabel = 'Archive root';
+  const rootLabel = 'Archive';
   const currentPathName = currentPath ? getBasename(currentPath) : rootLabel;
   const pendingSelectionPath = pendingSelection || '';
   const activeEntries = filteredEntries;
@@ -145,9 +178,85 @@ export default function App() {
     setLightboxOpen
   });
 
-  const handleHighlight = (entry) => {
-    setSelected(entry);
+  const closeContextMenu = () => {
+    setContextMenu((prev) => ({ ...prev, open: false, entry: null }));
   };
+
+  const openContextMenu = (entry, position, menuType = 'entry') => {
+    if (!entry && menuType !== 'selection') return;
+    const menuWidth = 200;
+    const menuHeight = menuType === 'selection' ? 64 : 120;
+    const viewportWidth = window.innerWidth || 0;
+    const viewportHeight = window.innerHeight || 0;
+    const x = Math.min(position.x, Math.max(0, viewportWidth - menuWidth));
+    const y = Math.min(position.y, Math.max(0, viewportHeight - menuHeight));
+    setContextMenu({
+      open: true,
+      x,
+      y,
+      entry: menuType === 'selection' ? null : entry,
+      type: menuType
+    });
+  };
+
+  const handleContextSelect = () => {
+    if (!contextMenu.entry) return;
+    setSelectionMode(true);
+    setSelectionEntries([contextMenu.entry]);
+    closeContextMenu();
+  };
+
+  const handleContextDownload = async () => {
+    if (!contextMenu.entry) return;
+    setSelectionMode(true);
+    setSelectionEntries([contextMenu.entry]);
+    closeContextMenu();
+    const summary = await discoverSelection([contextMenu.entry]);
+    if (summary) {
+      setDownloadPrompt({ open: true, summary });
+    }
+  };
+
+  const handleContextCancelSelection = () => {
+    setSelectionMode(false);
+    closeContextMenu();
+  };
+
+  const handleRequestDownload = async () => {
+    const summary = await discoverSelection();
+    if (summary) {
+      setDownloadPrompt({ open: true, summary });
+    }
+  };
+
+  const handleConfirmDownload = () => {
+    if (!downloadPrompt.summary) return;
+    downloadSelection(null, downloadPrompt.summary);
+    setDownloadPrompt({ open: false, summary: null });
+  };
+
+  const handleCancelDownloadPrompt = () => {
+    setDownloadPrompt({ open: false, summary: null });
+  };
+
+  useEffect(() => {
+    if (!contextMenu.open) return undefined;
+    const handleKey = (event) => {
+      if (event.key === 'Escape') {
+        closeContextMenu();
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => {
+      window.removeEventListener('keydown', handleKey);
+    };
+  }, [contextMenu.open]);
+
+  useEffect(() => {
+    if (selectionMode) {
+      setSelected(null);
+    }
+  }, [selectionMode, setSelected]);
 
   const applySearch = (value) => {
     const trimmed = value.trim();
@@ -260,8 +369,26 @@ export default function App() {
           viewMode={viewMode}
           zoomLevel={zoomLevel}
           onSelect={handleOpen}
-          onHighlight={handleHighlight}
-          selectedPath={selected?.path || pendingSelectionPath}
+          selectedPath={selectionMode ? '' : (selected?.path || pendingSelectionPath)}
+          selectionMode={selectionMode}
+          selectedPaths={selectedPaths}
+          selectedCount={selectedCount}
+          onToggleSelection={toggleSelection}
+          onClearSelection={clearSelection}
+          onRequestDownload={handleRequestDownload}
+          onConfirmDownload={handleConfirmDownload}
+          onCancelDownloadPrompt={handleCancelDownloadPrompt}
+          onCancelDownload={cancelDownload}
+          onResetDownloadState={resetDownloadState}
+          onSetSelectionMode={setSelectionMode}
+          downloadState={downloadState}
+          downloadPrompt={downloadPrompt}
+          contextMenu={contextMenu}
+          onOpenContextMenu={openContextMenu}
+          onCloseContextMenu={closeContextMenu}
+          onContextSelect={handleContextSelect}
+          onContextDownload={handleContextDownload}
+          onContextCancelSelection={handleContextCancelSelection}
           searchQuery={searchQuery}
           searchResults={searchResults}
           searchStatus={searchStatus}

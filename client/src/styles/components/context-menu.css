@@ -1,0 +1,53 @@
+.context-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  z-index: 40;
+}
+
+.context-menu {
+  position: fixed;
+  min-width: 180px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.12);
+  z-index: 41;
+  display: grid;
+  gap: 4px;
+}
+
+.context-menu-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+}
+
+.context-menu-item:hover {
+  background: var(--panel-2);
+  border-color: var(--divider-subtle);
+}
+
+.context-menu-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
+
+.context-menu-icon .icon {
+  font-size: 14px;
+  line-height: 1;
+}
