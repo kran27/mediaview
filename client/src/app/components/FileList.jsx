@@ -48,7 +48,8 @@ const FileList = ({
   entries,
   viewMode,
   onSelect,
-  selectedPath
+  selectedPath,
+  onHighlight
 }) => {
   const containerRef = useRef(null);
 
@@ -95,6 +96,11 @@ const FileList = ({
                   data-path={entry.path}
                   className={`grid-card grid-folder-card ${isSelected ? 'selected' : ''}`}
                   onClick={() => onSelect(entry)}
+                  onContextMenu={(event) => {
+                    if (!onHighlight) return;
+                    event.preventDefault();
+                    onHighlight(entry);
+                  }}
                   style={{ '--index': index }}
                 >
                   <div className="grid-folder-thumb">
@@ -120,6 +126,11 @@ const FileList = ({
                 data-path={entry.path}
                 className={`grid-card ${isSelected ? 'selected' : ''}`}
                 onClick={() => onSelect(entry)}
+                onContextMenu={(event) => {
+                  if (!onHighlight) return;
+                  event.preventDefault();
+                  onHighlight(entry);
+                }}
                 style={{ '--index': index }}
               >
                 <div className="thumb">
@@ -164,6 +175,11 @@ const FileList = ({
               data-path={entry.path}
               className={`list-row ${isSelected ? 'selected' : ''} ${entry.isDir ? 'is-dir' : ''}`}
               onClick={() => onSelect(entry)}
+              onContextMenu={(event) => {
+                if (!onHighlight) return;
+                event.preventDefault();
+                onHighlight(entry);
+              }}
               style={{ '--index': index }}
             >
               <span className="list-cell name">

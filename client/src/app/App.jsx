@@ -144,6 +144,10 @@ export default function App() {
     setLightboxOpen
   });
 
+  const handleHighlight = (entry) => {
+    setSelected(entry);
+  };
+
   const applySearch = (value) => {
     const trimmed = value.trim();
     if (trimmed) {
@@ -256,6 +260,7 @@ export default function App() {
           viewMode={viewMode}
           zoomLevel={zoomLevel}
           onSelect={handleOpen}
+          onHighlight={handleHighlight}
           selectedPath={selected?.path || pendingSelectionPath}
           searchQuery={searchQuery}
           searchResults={searchResults}

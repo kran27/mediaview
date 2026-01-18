@@ -15,6 +15,7 @@ const DirectoryPanel = ({
   viewMode,
   zoomLevel,
   onSelect,
+  onHighlight,
   selectedPath,
   searchQuery,
   searchResults,
@@ -81,6 +82,7 @@ const DirectoryPanel = ({
                 entries={entries}
                 viewMode={viewMode}
                 onSelect={onSelect}
+                onHighlight={onHighlight}
                 selectedPath={selectedPath}
                 zoomLevel={zoomLevel}
               />
@@ -115,6 +117,7 @@ const DirectoryPanel = ({
                 entries={entries}
                 viewMode={viewMode}
                 onSelect={onSelect}
+                onHighlight={onHighlight}
                 selectedPath={selectedPath}
                 zoomLevel={zoomLevel}
               />

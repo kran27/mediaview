@@ -35,7 +35,6 @@
   width: 100%;
 }
 
-.list-row:hover,
 .list-row.selected {
   border-color: var(--accent-border-soft);
   background: var(--accent-bg-soft);
@@ -219,10 +218,21 @@
   padding: 6px;
 }
 
-.grid-card.selected,
-.grid-card:hover {
+.grid-card.selected {
   border-color: var(--accent-border);
   background: var(--accent-bg);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .list-row:hover {
+    border-color: var(--accent-border-soft);
+    background: var(--accent-bg-soft);
+  }
+
+  .grid-card:hover {
+    border-color: var(--accent-border);
+    background: var(--accent-bg);
+  }
 }
 
 .thumb {
