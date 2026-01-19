@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 jobs:
@@ -22,6 +22,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set image tag
+        id: set_tag
+        run: |
+          echo "tag=$(date -u +%F)-${{ github.run_id }}" >> $GITHUB_OUTPUT
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -30,3 +35,12 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:latest
             ghcr.io/${{ github.repository }}:${{ github.sha }}
+            ghcr.io/${{ github.repository }}:${{ steps.set_tag.outputs.tag }}
+
+      - name: GH Release
+        uses: softprops/action-gh-release@v2.5.0
+        with:
+          name: ${{ steps.set_tag.outputs.tag }}
+          tag_name: ${{ steps.set_tag.outputs.tag }}
+          make_latest: true
+
