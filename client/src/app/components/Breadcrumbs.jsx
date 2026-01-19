@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { IconDatabase } from './index.js';
 
-const Breadcrumbs = ({ path, onNavigate, searchQuery }) => {
+const Breadcrumbs = ({ path, onNavigate, searchQuery, isPathStale = false }) => {
   const scrollRef = useRef(null);
   const segments = path ? path.split('/') : [];
 
@@ -30,7 +30,7 @@ const Breadcrumbs = ({ path, onNavigate, searchQuery }) => {
   }, [path, searchQuery]);
 
   const isSearchActive = Boolean(searchQuery);
-  const isRootCurrent = !path && !isSearchActive;
+  const isRootCurrent = !path && !isSearchActive && !isPathStale;
 
   return (
     <div className="breadcrumbs-scroll" ref={scrollRef}>
@@ -54,7 +54,7 @@ const Breadcrumbs = ({ path, onNavigate, searchQuery }) => {
         )}
         {!isSearchActive && segments.map((segment, index) => {
           const crumbPath = segments.slice(0, index + 1).join('/');
-          const isCurrent = index === segments.length - 1;
+          const isCurrent = !isPathStale && index === segments.length - 1;
           return (
             <span className="crumb-segment" key={crumbPath}>
               <span className="crumb-separator">/</span>

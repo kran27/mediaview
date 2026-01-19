@@ -7,6 +7,8 @@ import {
   IconClose,
   IconDownload,
   IconFolder,
+  IconFolderX,
+  IconSearch,
   SortButtons
 } from './index.js';
 
@@ -218,6 +220,7 @@ const DirectoryPanel = ({
   searchResults,
   searchStatus,
   onRetrySearch,
+  onClearSearch,
   onRetryList
 }) => {
   const panelRef = useRef(null);
@@ -260,6 +263,7 @@ const DirectoryPanel = ({
       : directory
         ? `${directory.stats.dirs} folders, ${directory.stats.files} files`
         : 'Loading...');
+  const notFoundPath = currentPath || rootLabel;
   const sortedEntries = useMemo(() => {
     const list = Array.isArray(entries) ? [...entries] : [];
     if (list.length === 0) return list;
@@ -322,7 +326,7 @@ const DirectoryPanel = ({
   return (
     <div
       ref={panelRef}
-      className={`panel list-panel${selectionMode ? ' selection-active' : ''}`}
+      className={`panel list-panel${selectionMode ? ' selection-active' : ''}${hasError ? ' has-error' : ''}`}
     >
       <div className="panel-header">
         <div>
@@ -428,7 +432,29 @@ const DirectoryPanel = ({
               </div>
             )}
             {!searchLoading && !searchError && searchCount === 0 && (
-              <div className="state">No results found.</div>
+              <div className="not-found">
+                <div className="not-found-copy">
+                  <div className="not-found-title">
+                    <span className="not-found-title-icon" aria-hidden="true">
+                      <IconSearch />
+                    </span>
+                    No results
+                  </div>
+                  <div className="not-found-subtitle">We couldn&apos;t find anything for this search.</div>
+                  <div className="not-found-desc">
+                    Try a different keyword or clear the search to return to your last folder.
+                  </div>
+                  <div className="not-found-actions">
+                    <button
+                      type="button"
+                      className="state-cta"
+                      onClick={onClearSearch}
+                    >
+                      Clear search
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
             {!searchLoading && !searchError && searchCount > 0 && (
               <FileList
@@ -448,25 +474,66 @@ const DirectoryPanel = ({
           <>
             {status.loading && !status.error && <div className="state">Loading...</div>}
             {status.error && (
-              <div className="state error">
-                <div>{status.error}</div>
-                <div className="state-actions">
-                  {status.retryable && onRetryList && (
-                    <button type="button" className="state-cta" onClick={onRetryList}>
-                      Retry
-                    </button>
-                  )}
-                  {lastGoodPath !== null && lastGoodPath !== undefined && (
-                    <button
-                      type="button"
-                      className="state-cta"
-                      onClick={() => onNavigate(lastGoodPath)}
-                    >
-                      View {lastGoodPath ? lastGoodPath : rootLabel}
-                    </button>
-                  )}
+              isNotFound ? (
+                <div className="not-found">
+                  <div className="not-found-copy">
+                    <div className="not-found-title">
+                      <span className="not-found-title-icon" aria-hidden="true">
+                        <IconFolderX />
+                      </span>
+                      404
+                    </div>
+                    <div className="not-found-subtitle">You&apos;ve lost your way.</div>
+                    <div className="not-found-desc">
+                      We could not find the path you requested. Try opening the archive root or return
+                      to the last available folder.
+                    </div>
+                    <div className="not-found-actions">
+                      {status.retryable && onRetryList && (
+                        <button type="button" className="state-cta" onClick={onRetryList}>
+                          Retry
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="state-cta"
+                        onClick={() => onNavigate('')}
+                      >
+                        Go to archive root
+                      </button>
+                      {lastGoodPath !== null && lastGoodPath !== undefined && (
+                        <button
+                          type="button"
+                          className="state-cta"
+                          onClick={() => onNavigate(lastGoodPath)}
+                        >
+                          Go to last available folder
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="state error">
+                  <div>{status.error}</div>
+                  <div className="state-actions">
+                    {status.retryable && onRetryList && (
+                      <button type="button" className="state-cta" onClick={onRetryList}>
+                        Retry
+                      </button>
+                    )}
+                    {lastGoodPath !== null && lastGoodPath !== undefined && (
+                      <button
+                        type="button"
+                        className="state-cta"
+                        onClick={() => onNavigate(lastGoodPath)}
+                      >
+                        View {lastGoodPath ? lastGoodPath : rootLabel}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
             )}
             {!status.loading && !status.error && (
               <FileList

@@ -338,6 +338,7 @@ export default function App() {
           path={status.error ? lastGoodPath : currentPath}
           onNavigate={handleNavigate}
           searchQuery={searchQuery}
+          isPathStale={Boolean(status.error)}
         />
       </div>
 
@@ -395,6 +396,7 @@ export default function App() {
           searchResults={searchResults}
           searchStatus={searchStatus}
           onRetrySearch={retrySearch}
+          onClearSearch={handleClearSearch}
           onRetryList={handleRetryList}
         />
       </main>
