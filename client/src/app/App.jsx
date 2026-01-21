@@ -84,6 +84,7 @@ export default function App() {
   const [lastBrowsePath, setLastBrowsePath] = useState('');
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const searchHeaderRef = useRef(null);
+  const layoutRef = useRef(null);
   const loadDirectoryRef = useRef(loadDirectory);
   const isSearchMode = Boolean(searchQuery);
   const searchStateRef = useRef({ searchQuery: '', searchInput: '' });
@@ -104,7 +105,63 @@ export default function App() {
     searchStateRef.current.searchQuery = searchQuery;
   }, [searchQuery]);
 
-  const handleClearSearch = () => {
+  useEffect(() => {
+    const layoutEl = layoutRef.current;
+    if (isTreeHidden || !layoutEl) {
+      layoutEl?.removeAttribute('data-footer-overlay');
+      return undefined;
+    }
+    const footer = document.querySelector('.app-footer');
+    if (!footer) return undefined;
+
+    const setOverlayVisible = (visible) => {
+      if (visible) {
+        layoutEl.setAttribute('data-footer-overlay', 'true');
+      } else {
+        layoutEl.removeAttribute('data-footer-overlay');
+      }
+    };
+
+    const updateOverlay = () => {
+      const rect = footer.getBoundingClientRect();
+      const visible = rect.top < window.innerHeight && rect.bottom > 0;
+      setOverlayVisible(visible);
+    };
+
+    let ticking = false;
+    const onScroll = () => {
+      if (!ticking) {
+        ticking = true;
+        requestAnimationFrame(() => {
+          ticking = false;
+          updateOverlay();
+        });
+      }
+    };
+
+    let observer;
+    if (typeof IntersectionObserver !== 'undefined') {
+      observer = new IntersectionObserver(() => updateOverlay(), { threshold: [0, 0.01] });
+      observer.observe(footer);
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    updateOverlay();
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      layoutEl.removeAttribute('data-footer-overlay');
+    };
+  }, [isTreeHidden]);
+
+  const handleFooterOverlayClick = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const clearSearchState = () => {
     searchHeaderRef.current?.setSearchValue('');
     searchHeaderRef.current?.setSearchFocused(false);
     searchStateRef.current.searchInput = '';
@@ -151,7 +208,7 @@ export default function App() {
 
   const handleNavigate = (pathValue, options = {}) => {
     if (hasSearchState()) {
-      handleClearSearch();
+      clearSearchState();
     }
     return navigateTo(pathValue, options);
   };
@@ -284,7 +341,7 @@ export default function App() {
 
   const handleCloseSearch = () => {
     const returnPath = lastBrowsePath ?? '';
-    handleClearSearch();
+    clearSearchState();
     void navigateTo(returnPath);
   };
 
@@ -303,7 +360,7 @@ export default function App() {
   );
 
   useUrlSync({
-    clearSearch: handleClearSearch,
+    clearSearch: clearSearchState,
     setSearchInput: setSearchInputValue,
     applySearch,
     navigateTo,
@@ -317,7 +374,7 @@ export default function App() {
         rootLabel={rootLabel}
         onNavigateRoot={() => {
           if (hasSearchState()) {
-            handleClearSearch();
+            clearSearchState();
           }
           void navigateTo('');
         }}
@@ -342,7 +399,7 @@ export default function App() {
         />
       </div>
 
-      <main className={`layout zoom-${zoomLevel}`}>
+      <main className={`layout zoom-${zoomLevel}`} ref={layoutRef}>
         {!isTreeHidden && (
           <TreePanel
             tree={tree}
@@ -356,6 +413,7 @@ export default function App() {
             hideHeader={false}
             status={treeStatus}
             onRetry={retryTree}
+            selectionMode={selectionMode}
           />
         )}
 
@@ -396,8 +454,13 @@ export default function App() {
           searchResults={searchResults}
           searchStatus={searchStatus}
           onRetrySearch={retrySearch}
-          onClearSearch={handleClearSearch}
+          onClearSearch={handleCloseSearch}
           onRetryList={handleRetryList}
+        />
+        <div
+          className="footer-scroll-guard"
+          aria-hidden="true"
+          onClick={handleFooterOverlayClick}
         />
       </main>
 

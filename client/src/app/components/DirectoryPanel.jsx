@@ -223,7 +223,7 @@ const DirectoryPanel = ({
   onClearSearch,
   onRetryList
 }) => {
-  const panelRef = useRef(null);
+  const panelBodyRef = useRef(null);
   const hasError = Boolean(status.error);
   const isNotFound = status?.code === 404;
   const isSearchActive = Boolean(searchQuery);
@@ -250,6 +250,9 @@ const DirectoryPanel = ({
       ? 'Not found'
       : (hasError ? '' : (isRoot ? rootLabel : (directory?.current?.name || currentPathName || rootLabel)));
   const searchResultLabel = `${searchCount} result${searchCount === 1 ? '' : 's'} for "${searchQuery}"`;
+  const contentKey = isSearchActive
+    ? `search:${searchQuery || 'results'}:${searchStatus?.loading ? 'loading' : 'done'}:${searchResults?.length || 0}`
+    : `path:${currentPath || 'root'}`;
   const subLabel = isSearchActive
     ? (
       searchLoading
@@ -263,7 +266,6 @@ const DirectoryPanel = ({
       : directory
         ? `${directory.stats.dirs} folders, ${directory.stats.files} files`
         : 'Loading...');
-  const notFoundPath = currentPath || rootLabel;
   const sortedEntries = useMemo(() => {
     const list = Array.isArray(entries) ? [...entries] : [];
     if (list.length === 0) return list;
@@ -323,20 +325,43 @@ const DirectoryPanel = ({
     onSetSelectionMode,
     selectionMode
   ]);
+
+  useEffect(() => {
+    if (isSearchActive) return;
+    const panelBody = panelBodyRef.current;
+    if (!panelBody) return;
+    if (panelBody.scrollHeight > panelBody.clientHeight) {
+      panelBody.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    }
+  }, [currentPath, isSearchActive]);
+
   return (
     <div
-      ref={panelRef}
       className={`panel list-panel${selectionMode ? ' selection-active' : ''}${hasError ? ' has-error' : ''}`}
     >
-      <div className="panel-header">
+      <div className={`panel-header${selectionMode ? ' is-selection' : ''}`}>
         <div>
+          {selectionMode && (
+            <span className="panel-header-icon" aria-hidden="true">
+              <IconCheck2Square />
+            </span>
+          )}
           <span className="panel-title">{titleText}</span>
           <span className="panel-sub">{subLabel}</span>
         </div>
         <div className="panel-actions">
           {!hasError && (
             <>
-              {!selectionMode && (
+              {selectionMode ? (
+                <button
+                  type="button"
+                  className="panel-action-btn"
+                  onClick={() => onSetSelectionMode(false)}
+                >
+                  <IconClose />
+                  Cancel selection
+                </button>
+              ) : (
                 <button
                   type="button"
                   className="panel-action-btn"
@@ -351,7 +376,7 @@ const DirectoryPanel = ({
           )}
         </div>
       </div>
-      <div className="panel-body">
+      <div className="panel-body" ref={panelBodyRef}>
         {contextMenu?.open && (
           <>
             <button
@@ -418,7 +443,8 @@ const DirectoryPanel = ({
             }}
           />
         )}
-        {isSearchActive ? (
+        <div className="directory-content" key={contentKey}>
+          {isSearchActive ? (
           <>
             {searchLoading && <div className="state">Searching...</div>}
             {searchError && (
@@ -550,6 +576,7 @@ const DirectoryPanel = ({
             )}
           </>
         )}
+        </div>
       </div>
       {selectionMode && (
         <div

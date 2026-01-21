@@ -71,7 +71,8 @@ const TreePanel = ({
   onExpandCurrent,
   hideHeader = false,
   status,
-  onRetry
+  onRetry,
+  selectionMode = false
 }) => {
   const rootNode = tree[rootPath];
   const hasError = Boolean(status?.error);
@@ -80,7 +81,7 @@ const TreePanel = ({
   if (!rootNode) return null;
   return (
     <div className="panel tree-panel">
-      <div className="panel-header">
+      <div className={`panel-header${selectionMode ? ' is-selection' : ''}`}>
         <div>
           {!hideHeader && <span className="panel-title">Folders</span>}
         </div>

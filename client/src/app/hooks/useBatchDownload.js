@@ -102,12 +102,15 @@ export const useBatchDownload = () => {
       const next = new Map(prev);
       if (next.has(entry.path)) {
         next.delete(entry.path);
+        if (next.size === 0) {
+          setSelectionModeSafe(false);
+        }
       } else {
         next.set(entry.path, normalizeEntry(entry));
       }
       return next;
     });
-  }, [normalizeEntry]);
+  }, [normalizeEntry, setSelectionModeSafe]);
 
   const setSelectionEntries = useCallback((entries) => {
     const next = new Map();
