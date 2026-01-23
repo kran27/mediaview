@@ -71,9 +71,11 @@ const useAppController = () => {
   const baseTitle = "The Mirror's Edge Archive";
   const currentPathName = currentPath ? getBasename(currentPath) : 'Archive';
   const pendingSelectionPath = pendingSelection || '';
-  const activeEntries = searchQuery
-    ? searchResults
-    : (directory?.entries || []);
+  const activeEntries = useMemo(() => (
+    searchQuery
+      ? searchResults
+      : (directory?.entries || [])
+  ), [directory?.entries, searchQuery, searchResults]);
   const isTreeHidden = useMediaQuery('(max-width: 1100px)');
 
   useEffect(() => {
