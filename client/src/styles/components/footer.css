@@ -6,6 +6,31 @@
   font-size: 10px;
 }
 
+.footer-drawer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  transform: translateY(100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 220ms ease-out, opacity 160ms ease-out;
+  z-index: 8;
+}
+
+.footer-drawer.is-open {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.footer-drawer .app-footer {
+  max-height: min(60vh, 520px);
+  overflow: auto;
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -24px 60px rgba(0, 0, 0, 0.3);
+}
+
 .footer-top {
   display: flex;
   align-items: baseline;

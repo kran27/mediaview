@@ -1,6 +1,8 @@
 # MediaView
 
-Web-based file browser and media viewer inspired by h5ai. The Node backend serves a local archive directory and exposes API endpoints for listing, streaming, thumbnails, and tree hydration. The React frontend provides a folder tree, list/grid views, and a lightbox viewer.
+Web-based file browser and media viewer inspired by h5ai. Optimized for reliable caching, fast delivery and a great experience on both mobile and desktop.
+
+The Node backend serves a local archive directory and exposes API endpoints for listing, streaming, thumbnails, and tree hydration. The React frontend provides a folder tree, list/grid views, and a lightbox viewer.
 
 ## Features
 

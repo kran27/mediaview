@@ -85,7 +85,7 @@
   height: 26px;
   flex: 0 0 22px;
   border-radius: 4px;
-  color: rgba(0, 0, 0, 0.55);
+  color: var(--text-subtle);
   background: transparent;
   line-height: 1;
   display: inline-flex;

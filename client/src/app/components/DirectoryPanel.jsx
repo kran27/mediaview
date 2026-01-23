@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { formatSize } from '../../lib/format.js';
 import {
   FileList,
@@ -8,13 +8,14 @@ import {
   IconDownload,
   IconFolder,
   IconFolderX,
+  IconFolderOpen,
   IconSearch,
   SortButtons
 } from './index.js';
 
 const DownloadConfirmModal = ({ summary, onCancel, onConfirm }) => {
   const warning = summary?.writerMode === 'memory'
-    ? 'This download may not finish in your browser. If it stalls, try a smaller selection or another browser.'
+    ? 'Your browser does not support streaming this download. If the download stalls, try a smaller set or another browser.'
     : '';
 
   return (
@@ -33,15 +34,15 @@ const DownloadConfirmModal = ({ summary, onCancel, onConfirm }) => {
       >
         <div className="download-modal-header">
           <div className="download-modal-title" id="download-modal-title">
-            Confirm download
+            Ready to download
           </div>
           <div className="download-modal-sub">
-            Review the selection before downloading.
+            Review your selection and start the download.
           </div>
         </div>
         <div className="download-modal-body">
           <div className="download-modal-row">
-            <span>Files</span>
+            <span>Items</span>
             <strong>{summary.totalFiles}</strong>
           </div>
           <div className="download-modal-row">
@@ -81,20 +82,18 @@ const DownloadProgressModal = ({
   onDismiss
 }) => (
   <>
-    <button
-      type="button"
-      className="download-progress-backdrop"
-      onClick={state.status === 'listing'
-        || state.status === 'downloading'
-        || state.status === 'finalizing'
-        ? onCancel
-        : onDismiss}
-      aria-label={state.status === 'listing'
-        || state.status === 'downloading'
-        || state.status === 'finalizing'
-        ? 'Cancel download'
-        : 'Close download status'}
-    />
+    {state.status === 'listing'
+      || state.status === 'downloading'
+      || state.status === 'finalizing' ? (
+        <div className="download-progress-backdrop" aria-hidden="true" />
+      ) : (
+        <button
+          type="button"
+          className="download-progress-backdrop"
+          onClick={onDismiss}
+          aria-label="Close download status"
+        />
+      )}
     <div
       className="download-progress-modal"
       role="dialog"
@@ -104,8 +103,8 @@ const DownloadProgressModal = ({
       <div className="download-progress-header">
         <div className="download-progress-title" id="download-progress-title">
           {state.status === 'listing' && 'Preparing download'}
-          {state.status === 'downloading' && 'Downloading selection'}
-          {state.status === 'finalizing' && 'Finalizing archive'}
+          {state.status === 'downloading' && 'Downloading files'}
+          {state.status === 'finalizing' && 'Finishing download'}
           {state.status === 'warning' && 'Download finished with warnings'}
           {state.status === 'done' && 'Download complete'}
           {state.status === 'error' && 'Download failed'}
@@ -115,7 +114,7 @@ const DownloadProgressModal = ({
           {(state.status === 'listing'
             || state.status === 'downloading'
             || state.status === 'finalizing')
-            ? 'Keep this window open while we prepare your archive.'
+            ? 'Indexing your selection, please wait.'
             : 'You can close this window when you are ready.'}
         </div>
       </div>
@@ -123,7 +122,7 @@ const DownloadProgressModal = ({
         {state.status === 'listing' && (
           <div className="download-progress-meta">
             <span>{state.processedDirs} folders scanned</span>
-            <span>{state.queuedDirs} pending</span>
+            <span>{state.queuedDirs} remaining</span>
           </div>
         )}
         {state.status === 'downloading' && (
@@ -146,7 +145,7 @@ const DownloadProgressModal = ({
         )}
         {state.status === 'finalizing' && (
           <div className="download-progress-meta">
-            Finishing up your download...
+            Wrapping up your download...
           </div>
         )}
         {(state.status === 'warning'
@@ -154,9 +153,9 @@ const DownloadProgressModal = ({
           || state.status === 'error'
           || state.status === 'cancelled') && (
           <div className="download-progress-meta">
-            {state.status === 'warning' && 'We finished the download, but some items may be missing.'}
-            {state.status === 'done' && 'The downloaded files can be found in the previously selected download location.'}
-            {state.status === 'error' && 'Something went wrong while preparing the download.'}
+            {state.status === 'warning' && 'The download finished, but some items may be missing.'}
+            {state.status === 'done' && 'Your files are saved to the selected download location.'}
+            {state.status === 'error' && 'Could not not finish the download. Please try again.'}
             {state.status === 'cancelled' && 'The download was cancelled.'}
           </div>
         )}
@@ -195,6 +194,7 @@ const DirectoryPanel = ({
   entries,
   viewMode,
   zoomLevel,
+  useWindowScroll,
   onSelect,
   selectedPath,
   selectionMode,
@@ -223,7 +223,6 @@ const DirectoryPanel = ({
   onClearSearch,
   onRetryList
 }) => {
-  const panelBodyRef = useRef(null);
   const hasError = Boolean(status.error);
   const isNotFound = status?.code === 404;
   const isSearchActive = Boolean(searchQuery);
@@ -266,23 +265,36 @@ const DirectoryPanel = ({
       : directory
         ? `${directory.stats.dirs} folders, ${directory.stats.files} files`
         : 'Loading...');
+  const baseEntries = useMemo(
+    () => (Array.isArray(entries) ? entries : []),
+    [entries]
+  );
+  const collator = useMemo(() => new Intl.Collator(undefined, { sensitivity: 'base' }), []);
   const sortedEntries = useMemo(() => {
-    const list = Array.isArray(entries) ? [...entries] : [];
-    if (list.length === 0) return list;
-    return list.sort((a, b) => {
+    if (!baseEntries.length) return baseEntries;
+    const list = [...baseEntries];
+    list.sort((a, b) => {
       if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
       let compare = 0;
       if (sortKey === 'name') {
-        compare = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+        compare = collator.compare(a.name || '', b.name || '');
       } else if (sortKey === 'size') {
         compare = (a.size || 0) - (b.size || 0);
       }
       if (compare === 0) {
-        compare = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+        compare = collator.compare(a.name || '', b.name || '');
       }
-      return sortDir === 'asc' ? compare : -compare;
+      return sortDir === 'desc' ? -compare : compare;
     });
-  }, [entries, sortKey, sortDir]);
+    return list;
+  }, [baseEntries, collator, sortKey, sortDir]);
+  const entryCount = sortedEntries.length;
+  const panelBodyRef = useRef(null);
+  const [panelBodyNode, setPanelBodyNode] = useState(null);
+  const handlePanelBodyRef = useCallback((node) => {
+    panelBodyRef.current = node;
+    setPanelBodyNode((prev) => (prev === node ? prev : node));
+  }, []);
 
   const handleSortClick = (key) => {
     if (sortKey === key) {
@@ -339,7 +351,7 @@ const DirectoryPanel = ({
     <div
       className={`panel list-panel${selectionMode ? ' selection-active' : ''}${hasError ? ' has-error' : ''}`}
     >
-      <div className={`panel-header${selectionMode ? ' is-selection' : ''}`}>
+      <div className="panel-header">
         <div>
           {selectionMode && (
             <span className="panel-header-icon" aria-hidden="true">
@@ -355,7 +367,7 @@ const DirectoryPanel = ({
               {selectionMode ? (
                 <button
                   type="button"
-                  className="panel-action-btn"
+                  className="panel-action-btn is-emphasis"
                   onClick={() => onSetSelectionMode(false)}
                 >
                   <IconClose />
@@ -376,7 +388,7 @@ const DirectoryPanel = ({
           )}
         </div>
       </div>
-      <div className="panel-body" ref={panelBodyRef}>
+      <div className="panel-body" ref={handlePanelBodyRef}>
         {contextMenu?.open && (
           <>
             <button
@@ -483,20 +495,22 @@ const DirectoryPanel = ({
               </div>
             )}
             {!searchLoading && !searchError && searchCount > 0 && (
-              <FileList
-                entries={sortedEntries}
-                viewMode={viewMode}
-                onSelect={onSelect}
-                selectedPath={selectedPath}
-                selectionMode={selectionMode}
-                selectedPaths={selectedPaths}
-                onToggleSelection={onToggleSelection}
-                onOpenContextMenu={onOpenContextMenu}
-                zoomLevel={zoomLevel}
-              />
-            )}
-          </>
-        ) : (
+                <FileList
+                  entries={sortedEntries}
+                  viewMode={viewMode}
+                  onSelect={onSelect}
+                  selectedPath={selectedPath}
+                  selectionMode={selectionMode}
+                  selectedPaths={selectedPaths}
+                  onToggleSelection={onToggleSelection}
+                  onOpenContextMenu={onOpenContextMenu}
+                  zoomLevel={zoomLevel}
+                  scrollParent={panelBodyNode}
+                  useWindowScroll={useWindowScroll}
+                />
+              )}
+            </>
+          ) : (
           <>
             {status.loading && !status.error && <div className="state">Loading...</div>}
             {status.error && (
@@ -561,21 +575,31 @@ const DirectoryPanel = ({
                 </div>
               )
             )}
-            {!status.loading && !status.error && (
-              <FileList
-                entries={sortedEntries}
-                viewMode={viewMode}
-                onSelect={onSelect}
-                selectedPath={selectedPath}
-                selectionMode={selectionMode}
-                selectedPaths={selectedPaths}
-                onToggleSelection={onToggleSelection}
-                onOpenContextMenu={onOpenContextMenu}
-                zoomLevel={zoomLevel}
-              />
+            {!status.loading && !status.error && entryCount === 0 && (
+              <div className="state empty">
+                <span className="state-icon" aria-hidden="true">
+                  <IconFolderOpen />
+                </span>
+                <div className="state-title">Nothing in here</div>
+              </div>
             )}
-          </>
-        )}
+            {!status.loading && !status.error && entryCount > 0 && (
+                <FileList
+                  entries={sortedEntries}
+                  viewMode={viewMode}
+                  onSelect={onSelect}
+                  selectedPath={selectedPath}
+                  selectionMode={selectionMode}
+                  selectedPaths={selectedPaths}
+                  onToggleSelection={onToggleSelection}
+                  onOpenContextMenu={onOpenContextMenu}
+                  zoomLevel={zoomLevel}
+                  scrollParent={panelBodyNode}
+                  useWindowScroll={useWindowScroll}
+                />
+              )}
+            </>
+          )}
         </div>
       </div>
       {selectionMode && (
@@ -588,7 +612,7 @@ const DirectoryPanel = ({
             <span className="selection-bar-icon" aria-hidden="true">
               <IconCheck2Square />
             </span>
-            <div className="selection-bar-title">Selection mode</div>
+            <div className="selection-bar-title">Select items</div>
           </div>
           <div className="selection-bar-actions">
             <button

@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { IconClose, IconSearch, ViewToggle } from './index.js';
+import { IconClose, IconInfoCircle, IconSearch, ViewToggle } from './index.js';
 
 const AppHeader = forwardRef(({
   onNavigateRoot,
@@ -10,7 +10,10 @@ const AppHeader = forwardRef(({
   searchQuery,
   onSearchValueChange,
   onSearchSubmit,
-  onSearchClear
+  onSearchClear,
+  onToggleFooter,
+  showFooterToggle,
+  footerOpen
 }, ref) => {
   const inputRef = useRef(null);
   const [searchValue, setSearchValue] = useState('');
@@ -129,6 +132,17 @@ const AppHeader = forwardRef(({
             <IconClose />
           </button>
         </form>
+        {showFooterToggle && (
+          <button
+            type="button"
+            className={`topbar-info${footerOpen ? ' is-active' : ''}`}
+            onClick={onToggleFooter}
+            aria-label="Info & legel"
+            title="Info & legal"
+          >
+            <IconInfoCircle />
+          </button>
+        )}
         <ViewToggle
           viewMode={viewMode}
           onChange={onViewModeChange}

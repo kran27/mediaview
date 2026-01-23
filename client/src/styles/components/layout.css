@@ -3,6 +3,8 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .layout {
@@ -14,6 +16,8 @@
   height: calc(100vh - var(--topbar-height) - var(--breadcrumbs-height));
   overflow: hidden;
   position: relative;
+  flex: 1;
+  min-height: 0;
   --tree-panel-width: 260px;
   --thumb-ratio: 3 / 2;
   --folder-thumb: 64px;
@@ -26,6 +30,7 @@
 .layout > .panel + .panel {
   border-left: 1px solid var(--divider);
 }
+
 
 .layout.zoom-sm {
   --grid-min: 100px;
@@ -44,21 +49,35 @@
 }
 
 .footer-scroll-guard {
-  position: absolute;
-  inset: 0;
+  position: fixed;
+  top: var(--topbar-height);
+  left: 0;
+  right: 0;
+  bottom: 0;
   z-index: 4;
   pointer-events: none;
+  opacity: 0;
+  background: rgba(10, 10, 10, 0.5);
+  transition: opacity 180ms ease-out;
 }
 
 .layout[data-footer-overlay='true'] .footer-scroll-guard {
   pointer-events: auto;
+  opacity: 1;
 }
 
 @media (max-width: 1100px) {
+  .page {
+    height: auto;
+    overflow: visible;
+  }
+
   .layout {
     grid-template-columns: 1fr;
     height: auto;
     min-height: calc(100vh - var(--topbar-height) - var(--breadcrumbs-height));
+    overflow: visible;
+    flex: 0 0 auto;
     --tree-panel-width: 0px;
   }
 
@@ -80,6 +99,7 @@
 @supports (height: 100dvh) {
   .page {
     min-height: 100dvh;
+    height: 100dvh;
   }
 
   .layout {
@@ -87,8 +107,8 @@
   }
 }
 
-@supports (height: 100dvh) {
-  @media (max-width: 1100px) {
+@media (max-width: 1100px) {
+  @supports (height: 100dvh) {
     .layout {
       height: auto;
       min-height: calc(100dvh - var(--topbar-height) - var(--breadcrumbs-height));

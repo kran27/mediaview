@@ -117,13 +117,14 @@
   background: var(--panel-2);
 }
 
-.breadcrumbs-bar.tree-hidden .crumb.current {
-  background: var(--accent-bg-emphasis);
-}
+@media (max-width: 1100px) {
+  .breadcrumbs-bar .crumb.current {
+    background: var(--accent-bg-emphasis);
+  }
 
-
-.breadcrumbs-bar.tree-hidden .crumb.current:not(.is-home):hover {
-  background: var(--accent-bg-emphasis-hover);
+  .breadcrumbs-bar .crumb.current:not(.is-home):hover {
+    background: var(--accent-bg-emphasis-hover);
+  }
 }
 
 .crumb-separator {
@@ -139,7 +140,7 @@
     font-size: 14px;
   }
 
-  .breadcrumbs-bar.tree-hidden .crumb.current:not(.is-home) {
+  .breadcrumbs-bar .crumb.current:not(.is-home) {
     padding: 0px 8px;
   }
 

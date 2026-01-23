@@ -3,11 +3,28 @@
   flex-direction: column;
   gap: 8px;
   width: 100%;
+  --list-row-height: calc(var(--list-thumb-size) + 16px);
 }
 
 .list-body {
   display: flex;
   flex-direction: column;
+  width: 100%;
+}
+
+.list-virtual {
+  flex: 1;
+  min-height: 0;
+}
+
+.list-body-virtual {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+
+.list-virtuoso-list {
   width: 100%;
 }
 
@@ -119,16 +136,58 @@
   margin: 4px;
 }
 
-.grid-sections {
-  display: grid;
-  gap: 18px;
+.grid-folder-section {
+  grid-auto-rows: auto;
 }
 
-.grid-folders {
-  grid-template-columns: repeat(auto-fill, minmax(var(--grid-min), 1fr));
-  grid-auto-rows: auto;
-  container-type: inline-size;
+.grid-folder-section .grid-folder-card {
+  grid-column: span 2;
 }
+
+
+.grid-virtual {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 140ms ease-out, transform 140ms ease-out;
+}
+
+@media (max-width: 1100px) {
+  .grid-virtual {
+    height: auto;
+    min-height: auto;
+    margin-bottom: 15px;
+  }
+
+  .list-virtual,
+  .list-body-virtual {
+    flex: 0 0 auto;
+    min-height: auto;
+  }
+
+  .list {
+    margin-bottom: 15px;
+  }
+}
+
+.grid-virtual.is-ready {
+  opacity: 1;
+  transform: translateY(0);
+}
+.grid-virtuoso-list {
+  container-type: inline-size;
+  grid-auto-rows: 1fr;
+}
+
+.virtuoso-grid-item {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+}
+
 
 .grid-folder-thumb {
   height: min(var(--folder-thumb), 100%);
@@ -194,6 +253,7 @@
   flex-direction: column;
   gap: 8px;
   height: 100%;
+  width: 100%;
   position: relative;
 }
 
@@ -206,22 +266,6 @@
   padding: var(--folder-card-pad-y) var(--folder-card-pad-x);
   min-height: calc(var(--folder-thumb) + 24px);
   container-type: inline-size;
-}
-
-.grid-folders .grid-folder-card {
-  grid-column: span 2;
-}
-
-@container (max-width: calc((var(--grid-min) * 2) + 14px)) {
-  .grid-folder-card {
-    grid-column: span 1;
-  }
-}
-
-@container (min-width: calc((var(--grid-min) * 2) + 14px)) {
-  .grid-folder-card {
-    aspect-ratio: var(--folder-card-ratio);
-  }
 }
 
 .layout.zoom-sm .grid-card {
@@ -391,5 +435,9 @@
   .grid-card.grid-folder-card {
     --folder-card-pad-x: 8px;
     --folder-card-pad-y: 6px;
+  }
+
+  .list {
+    --list-row-height: calc(var(--list-thumb-size) + 12px);
   }
 }

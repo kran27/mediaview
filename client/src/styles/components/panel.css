@@ -22,11 +22,6 @@
   height: 40px;
 }
 
-.panel-header.is-selection {
-  background: var(--accent-bg-strong);
-  border-bottom-color: var(--accent-border);
-}
-
 .panel-header > div:first-child {
   display: flex;
   align-items: center;
@@ -51,6 +46,13 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.panel-action-btn.is-emphasis {
+  border-color: var(--accent-border-soft);
+  background: transparent;
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .panel-title {
@@ -125,7 +127,13 @@
   }
 
   .panel-body {
+    flex: 0 0 auto;
+    min-height: auto;
     overflow: visible;
+  }
+
+  .panel.tree-panel {
+    display: none;
   }
 }
 
@@ -290,16 +298,31 @@
   background: var(--panel);
 }
 
-@media (max-width: 900px) {
-  .panel.tree-panel {
-    display: none;
-  }
-}
-
 .state {
   padding: 30px 0;
   text-align: center;
   color: var(--muted);
+}
+
+.state-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 10px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  opacity: 0.6;
+}
+
+.state-icon .icon {
+  width: 28px;
+  height: 28px;
+}
+
+.state-title {
+  font-weight: 600;
+  color: var(--text);
+  opacity: 0.6;
 }
 
 .not-found {
@@ -429,7 +452,10 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: min(92vw, 360px);
+  width: min(92vw, 400px);
+  min-height: 200px;
+  grid-template-rows: auto minmax(80px, 1fr) auto;
+  align-content: start;
   background: var(--panel);
   border: 1px solid var(--divider);
   border-radius: 16px;
@@ -455,6 +481,7 @@
   display: grid;
   gap: 8px;
   font-size: 12px;
+  align-content: start;
 }
 
 .download-modal-row {
@@ -524,6 +551,9 @@
   left: 50%;
   transform: translate(-50%, -50%);
   width: min(92vw, 400px);
+  min-height: 200px;
+  grid-template-rows: auto minmax(80px, 1fr) auto;
+  align-content: start;
   background: var(--panel);
   border: 1px solid var(--divider);
   border-radius: 16px;
@@ -549,6 +579,7 @@
   display: grid;
   gap: 10px;
   font-size: 12px;
+  align-content: start;
 }
 
 .download-progress-meta {

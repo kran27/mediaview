@@ -26,7 +26,7 @@ import { setUrlState } from '../lib/urlState.js';
 import { useDirectoryData } from './hooks/useDirectoryData.js';
 import { useBatchDownload } from './hooks/useBatchDownload.js';
 import { useLightboxState } from './hooks/useLightboxState.js';
-import { useResponsiveTree } from './hooks/useResponsiveTree.js';
+import { useMediaQuery } from './hooks/useMediaQuery.js';
 import { useUrlSync } from './hooks/useUrlSync.js';
 
 export default function App() {
@@ -83,6 +83,7 @@ export default function App() {
   });
   const [lastBrowsePath, setLastBrowsePath] = useState('');
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [footerOpen, setFooterOpen] = useState(false);
   const searchHeaderRef = useRef(null);
   const layoutRef = useRef(null);
   const loadDirectoryRef = useRef(loadDirectory);
@@ -95,7 +96,7 @@ export default function App() {
   const activeEntries = searchQuery
     ? searchResults
     : (directory?.entries || []);
-  const isTreeHidden = useResponsiveTree(1100);
+  const isTreeHidden = useMediaQuery('(max-width: 1100px)');
 
   useEffect(() => {
     loadDirectoryRef.current = loadDirectory;
@@ -107,58 +108,17 @@ export default function App() {
 
   useEffect(() => {
     const layoutEl = layoutRef.current;
-    if (isTreeHidden || !layoutEl) {
-      layoutEl?.removeAttribute('data-footer-overlay');
-      return undefined;
-    }
-    const footer = document.querySelector('.app-footer');
-    if (!footer) return undefined;
-
-    const setOverlayVisible = (visible) => {
-      if (visible) {
-        layoutEl.setAttribute('data-footer-overlay', 'true');
-      } else {
-        layoutEl.removeAttribute('data-footer-overlay');
-      }
-    };
-
-    const updateOverlay = () => {
-      const rect = footer.getBoundingClientRect();
-      const visible = rect.top < window.innerHeight && rect.bottom > 0;
-      setOverlayVisible(visible);
-    };
-
-    let ticking = false;
-    const onScroll = () => {
-      if (!ticking) {
-        ticking = true;
-        requestAnimationFrame(() => {
-          ticking = false;
-          updateOverlay();
-        });
-      }
-    };
-
-    let observer;
-    if (typeof IntersectionObserver !== 'undefined') {
-      observer = new IntersectionObserver(() => updateOverlay(), { threshold: [0, 0.01] });
-      observer.observe(footer);
-    }
-
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll);
-    updateOverlay();
-
-    return () => {
-      observer?.disconnect();
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
+    if (!layoutEl) return undefined;
+    if (!isTreeHidden && footerOpen) {
+      layoutEl.setAttribute('data-footer-overlay', 'true');
+    } else {
       layoutEl.removeAttribute('data-footer-overlay');
-    };
-  }, [isTreeHidden]);
+    }
+    return undefined;
+  }, [footerOpen, isTreeHidden]);
 
   const handleFooterOverlayClick = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setFooterOpen(false);
   };
 
   const clearSearchState = () => {
@@ -387,9 +347,12 @@ export default function App() {
         onSearchValueChange={handleSearchValueChange}
         onSearchSubmit={handleSearchSubmit}
         onSearchClear={handleCloseSearch}
+        onToggleFooter={() => setFooterOpen((prev) => !prev)}
+        showFooterToggle={!isTreeHidden}
+        footerOpen={footerOpen}
       />
 
-      <div className={`breadcrumbs-bar${isTreeHidden ? ' tree-hidden' : ''}`}>
+      <div className="breadcrumbs-bar">
         <Breadcrumbs
           rootLabel={rootLabel}
           path={status.error ? lastGoodPath : currentPath}
@@ -400,22 +363,19 @@ export default function App() {
       </div>
 
       <main className={`layout zoom-${zoomLevel}`} ref={layoutRef}>
-        {!isTreeHidden && (
-          <TreePanel
-            tree={tree}
-            currentPath={searchQuery ? null : currentPath}
-            rootPath=""
-            rootLabel={rootLabel}
-            onToggle={handleToggle}
-            onCollapseAll={collapseAll}
-            onExpandCurrent={expandToCurrentPath}
-            onNavigate={handleNavigate}
-            hideHeader={false}
-            status={treeStatus}
-            onRetry={retryTree}
-            selectionMode={selectionMode}
-          />
-        )}
+        <TreePanel
+          tree={tree}
+          currentPath={searchQuery ? null : currentPath}
+          rootPath=""
+          rootLabel={rootLabel}
+          onToggle={handleToggle}
+          onCollapseAll={collapseAll}
+          onExpandCurrent={expandToCurrentPath}
+          onNavigate={handleNavigate}
+          hideHeader={false}
+          status={treeStatus}
+          onRetry={retryTree}
+        />
 
         <DirectoryPanel
           directory={directory}
@@ -428,6 +388,7 @@ export default function App() {
           entries={activeEntries}
           viewMode={viewMode}
           zoomLevel={zoomLevel}
+          useWindowScroll={isTreeHidden}
           onSelect={handleOpen}
           selectedPath={selectionMode ? '' : (selected?.path || pendingSelectionPath)}
           selectionMode={selectionMode}
@@ -464,7 +425,13 @@ export default function App() {
         />
       </main>
 
-      <AppFooter />
+      {isTreeHidden ? (
+        <AppFooter />
+      ) : (
+        <div className={`footer-drawer${footerOpen ? ' is-open' : ''}`} aria-hidden={!footerOpen}>
+          <AppFooter />
+        </div>
+      )}
 
       <ConnectionLightbox
         open={showConnectionLightbox}
