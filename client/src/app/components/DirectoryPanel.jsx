@@ -1,6 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { formatSize } from '../../lib/format.js';
 import {
+  useContextMenuContext,
+  useDirectoryActionsContext,
+  useDirectoryDataContext,
+  useDownloadActionsContext,
+  useDownloadStateContext,
+  useSearchActionsContext,
+  useSearchStateContext,
+  useSelectionActionsContext,
+  useSelectionStateContext,
+  useViewContext
+} from '../contexts/index.js';
+import {
   FileList,
   IconCheck2Square,
   IconCheckCircleFill,
@@ -183,46 +195,359 @@ const DownloadProgressModal = ({
   </>
 );
 
-const DirectoryPanel = ({
-  directory,
-  rootLabel,
-  currentPath,
-  currentPathName,
+const DirectoryPanelHeader = ({
+  selectionMode,
+  titleText,
+  subLabel,
+  hasError,
+  sortKey,
+  sortDir,
+  onSortClick,
+  onSetSelectionMode
+}) => (
+  <div className="panel-header">
+    <div>
+      {selectionMode && (
+        <span className="panel-header-icon" aria-hidden="true">
+          <IconCheck2Square />
+        </span>
+      )}
+      <span className="panel-title">{titleText}</span>
+      <span className="panel-sub">{subLabel}</span>
+    </div>
+    <div className="panel-actions">
+      {!hasError && (
+        <>
+          {selectionMode ? (
+            <button
+              type="button"
+              className="panel-action-btn is-emphasis"
+              onClick={() => onSetSelectionMode(false)}
+            >
+              <IconClose />
+              Cancel selection
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="panel-action-btn"
+              onClick={() => onSetSelectionMode(true)}
+            >
+              <IconCheck2Square />
+              Select
+            </button>
+          )}
+          <SortButtons sortKey={sortKey} sortDir={sortDir} onSortClick={onSortClick} />
+        </>
+      )}
+    </div>
+  </div>
+);
+
+const DirectoryPanelBody = ({
+  handlePanelBodyRef,
+  contextMenu,
+  onCloseContextMenu,
+  onContextCancelSelection,
+  onContextSelect,
+  onContextDownload,
+  onContextGoToEntry,
+  isSearchActive,
+  downloadPrompt,
+  downloadSummary,
+  onCancelDownloadPrompt,
+  onConfirmDownload,
+  showProgressModal,
+  downloadState,
+  progressValue,
+  progressMax,
+  onCancelDownload,
+  onSetSelectionMode,
+  onResetDownloadState,
+  contentKey,
+  searchLoading,
+  searchError,
+  searchStatus,
+  searchCount,
+  onRetrySearch,
+  onClearSearch,
   status,
-  lastGoodPath,
+  isNotFound,
+  onRetryList,
   onNavigate,
-  entries,
+  lastGoodPath,
+  rootLabel,
+  entryCount,
+  sortedEntries,
   viewMode,
-  zoomLevel,
-  useWindowScroll,
   onSelect,
   selectedPath,
   selectionMode,
   selectedPaths,
-  selectedCount,
   onToggleSelection,
-  onRequestDownload,
-  onConfirmDownload,
-  onCancelDownloadPrompt,
-  onCancelDownload,
-  onSetSelectionMode,
-  onResetDownloadState,
-  downloadState,
-  downloadPrompt,
-  contextMenu,
   onOpenContextMenu,
-  onCloseContextMenu,
-  onContextSelect,
-  onContextDownload,
-  onContextCancelSelection,
-  onContextGoToEntry,
-  searchQuery,
-  searchResults,
-  searchStatus,
-  onRetrySearch,
-  onClearSearch,
-  onRetryList
-}) => {
+  zoomLevel,
+  panelBodyNode,
+  useWindowScroll
+}) => (
+  <div className="panel-body" ref={handlePanelBodyRef}>
+    {contextMenu?.open && (
+      <>
+        <button
+          type="button"
+          className="context-menu-backdrop"
+          onClick={onCloseContextMenu}
+          aria-label="Close menu"
+        />
+        <div
+          className="context-menu"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          role="menu"
+        >
+          {contextMenu.type === 'selection' ? (
+            <button type="button" className="context-menu-item" onClick={onContextCancelSelection}>
+              <span className="context-menu-icon" aria-hidden="true">
+                <IconClose />
+              </span>
+              Cancel
+            </button>
+          ) : (
+            <>
+              <button type="button" className="context-menu-item" onClick={onContextSelect}>
+                <span className="context-menu-icon" aria-hidden="true">
+                  <IconCheckCircleFill />
+                </span>
+                Select
+              </button>
+              <button type="button" className="context-menu-item" onClick={onContextDownload}>
+                <span className="context-menu-icon" aria-hidden="true">
+                  <IconDownload />
+                </span>
+                Download
+              </button>
+              {isSearchActive && (
+                <button type="button" className="context-menu-item" onClick={onContextGoToEntry}>
+                  <span className="context-menu-icon" aria-hidden="true">
+                    <IconFolder />
+                  </span>
+                  Go to file in folder
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      </>
+    )}
+    {downloadPrompt?.open && downloadSummary && (
+      <DownloadConfirmModal
+        summary={downloadSummary}
+        onCancel={onCancelDownloadPrompt}
+        onConfirm={onConfirmDownload}
+      />
+    )}
+    {showProgressModal && (
+      <DownloadProgressModal
+        state={downloadState}
+        progressValue={progressValue}
+        progressMax={progressMax}
+        onCancel={onCancelDownload}
+        onDismiss={() => {
+          onSetSelectionMode(false);
+          onResetDownloadState();
+        }}
+      />
+    )}
+    <div className="directory-content" key={contentKey}>
+      {isSearchActive ? (
+        <>
+          {searchLoading && <div className="state">Searching...</div>}
+          {searchError && (
+            <div className="state error">
+              <div>{searchStatus.error}</div>
+              {searchStatus.retryable && onRetrySearch && (
+                <button type="button" className="state-cta" onClick={onRetrySearch}>
+                  Retry search
+                </button>
+              )}
+            </div>
+          )}
+          {!searchLoading && !searchError && searchCount === 0 && (
+            <div className="not-found">
+              <div className="not-found-copy">
+                <div className="not-found-title">
+                  <span className="not-found-title-icon" aria-hidden="true">
+                    <IconSearch />
+                  </span>
+                  No results
+                </div>
+                <div className="not-found-subtitle">We couldn&apos;t find anything for this search.</div>
+                <div className="not-found-desc">
+                  Try a different keyword or clear the search to return to your last folder.
+                </div>
+                <div className="not-found-actions">
+                  <button
+                    type="button"
+                    className="state-cta"
+                    onClick={onClearSearch}
+                  >
+                    Clear search
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {!searchLoading && !searchError && searchCount > 0 && (
+            <FileList
+              entries={sortedEntries}
+              viewMode={viewMode}
+              onSelect={onSelect}
+              selectedPath={selectedPath}
+              selectionMode={selectionMode}
+              selectedPaths={selectedPaths}
+              onToggleSelection={onToggleSelection}
+              onOpenContextMenu={onOpenContextMenu}
+              zoomLevel={zoomLevel}
+              scrollParent={panelBodyNode}
+              useWindowScroll={useWindowScroll}
+            />
+          )}
+        </>
+      ) : (
+        <>
+          {status.loading && !status.error && <div className="state">Loading...</div>}
+          {status.error && (
+            isNotFound ? (
+              <div className="not-found">
+                <div className="not-found-copy">
+                  <div className="not-found-title">
+                    <span className="not-found-title-icon" aria-hidden="true">
+                      <IconFolderX />
+                    </span>
+                    404
+                  </div>
+                  <div className="not-found-subtitle">You&apos;ve lost your way.</div>
+                  <div className="not-found-desc">
+                    We could not find the path you requested. Try opening the archive root or return
+                    to the last available folder.
+                  </div>
+                  <div className="not-found-actions">
+                    {status.retryable && onRetryList && (
+                      <button type="button" className="state-cta" onClick={onRetryList}>
+                        Retry
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="state-cta"
+                      onClick={() => onNavigate('')}
+                    >
+                      Go to archive root
+                    </button>
+                    {lastGoodPath !== null && lastGoodPath !== undefined && (
+                      <button
+                        type="button"
+                        className="state-cta"
+                        onClick={() => onNavigate(lastGoodPath)}
+                      >
+                        Go to last available folder
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="state error">
+                <div>{status.error}</div>
+                <div className="state-actions">
+                  {status.retryable && onRetryList && (
+                    <button type="button" className="state-cta" onClick={onRetryList}>
+                      Retry
+                    </button>
+                  )}
+                  {lastGoodPath !== null && lastGoodPath !== undefined && (
+                    <button
+                      type="button"
+                      className="state-cta"
+                      onClick={() => onNavigate(lastGoodPath)}
+                    >
+                      View {lastGoodPath ? lastGoodPath : rootLabel}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          )}
+          {!status.loading && !status.error && entryCount === 0 && (
+            <div className="state empty">
+              <span className="state-icon" aria-hidden="true">
+                <IconFolderOpen />
+              </span>
+              <div className="state-title">Nothing in here</div>
+            </div>
+          )}
+          {!status.loading && !status.error && entryCount > 0 && (
+            <FileList
+              entries={sortedEntries}
+              viewMode={viewMode}
+              onSelect={onSelect}
+              selectedPath={selectedPath}
+              selectionMode={selectionMode}
+              selectedPaths={selectedPaths}
+              onToggleSelection={onToggleSelection}
+              onOpenContextMenu={onOpenContextMenu}
+              zoomLevel={zoomLevel}
+              scrollParent={panelBodyNode}
+              useWindowScroll={useWindowScroll}
+            />
+          )}
+        </>
+      )}
+    </div>
+  </div>
+);
+
+const DirectoryPanel = () => {
+  const {
+    directory,
+    currentPath,
+    currentPathName,
+    status,
+    lastGoodPath,
+    entries,
+    useWindowScroll
+  } = useDirectoryDataContext() || {};
+  const { onNavigate, onSelect, onRetryList } = useDirectoryActionsContext() || {};
+  const rootLabel = 'Archive';
+  const { viewMode, zoomLevel } = useViewContext();
+  const {
+    selectedPath,
+    selectionMode,
+    selectedPaths,
+    selectedCount = 0
+  } = useSelectionStateContext() || {};
+  const { onToggleSelection, onSetSelectionMode } = useSelectionActionsContext() || {};
+  const {
+    downloadState,
+    downloadPrompt
+  } = useDownloadStateContext() || {};
+  const {
+    onRequestDownload,
+    onConfirmDownload,
+    onCancelDownloadPrompt,
+    onCancelDownload,
+    onResetDownloadState
+  } = useDownloadActionsContext() || {};
+  const {
+    contextMenu,
+    onOpenContextMenu,
+    onCloseContextMenu,
+    onContextSelect,
+    onContextDownload,
+    onContextCancelSelection,
+    onContextGoToEntry
+  } = useContextMenuContext() || {};
+  const { searchQuery, searchResults, searchStatus } = useSearchStateContext() || {};
+  const { onRetrySearch, onClearSearch } = useSearchActionsContext() || {};
   const hasError = Boolean(status.error);
   const isNotFound = status?.code === 404;
   const isSearchActive = Boolean(searchQuery);
@@ -296,14 +621,14 @@ const DirectoryPanel = ({
     setPanelBodyNode((prev) => (prev === node ? prev : node));
   }, []);
 
-  const handleSortClick = (key) => {
+  const handleSortClick = useCallback((key) => {
     if (sortKey === key) {
       setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
       return;
     }
     setSortKey(key);
     setSortDir('asc');
-  };
+  }, [sortKey]);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -351,257 +676,62 @@ const DirectoryPanel = ({
     <div
       className={`panel list-panel${selectionMode ? ' selection-active' : ''}${hasError ? ' has-error' : ''}`}
     >
-      <div className="panel-header">
-        <div>
-          {selectionMode && (
-            <span className="panel-header-icon" aria-hidden="true">
-              <IconCheck2Square />
-            </span>
-          )}
-          <span className="panel-title">{titleText}</span>
-          <span className="panel-sub">{subLabel}</span>
-        </div>
-        <div className="panel-actions">
-          {!hasError && (
-            <>
-              {selectionMode ? (
-                <button
-                  type="button"
-                  className="panel-action-btn is-emphasis"
-                  onClick={() => onSetSelectionMode(false)}
-                >
-                  <IconClose />
-                  Cancel selection
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="panel-action-btn"
-                  onClick={() => onSetSelectionMode(true)}
-                >
-                  <IconCheck2Square />
-                  Select
-                </button>
-              )}
-              <SortButtons sortKey={sortKey} sortDir={sortDir} onSortClick={handleSortClick} />
-            </>
-          )}
-        </div>
-      </div>
-      <div className="panel-body" ref={handlePanelBodyRef}>
-        {contextMenu?.open && (
-          <>
-            <button
-              type="button"
-              className="context-menu-backdrop"
-              onClick={onCloseContextMenu}
-              aria-label="Close menu"
-            />
-            <div
-              className="context-menu"
-              style={{ top: contextMenu.y, left: contextMenu.x }}
-              role="menu"
-            >
-              {contextMenu.type === 'selection' ? (
-                <button type="button" className="context-menu-item" onClick={onContextCancelSelection}>
-                  <span className="context-menu-icon" aria-hidden="true">
-                    <IconClose />
-                  </span>
-                  Cancel
-                </button>
-              ) : (
-                <>
-                  <button type="button" className="context-menu-item" onClick={onContextSelect}>
-                    <span className="context-menu-icon" aria-hidden="true">
-                      <IconCheckCircleFill />
-                    </span>
-                    Select
-                  </button>
-                  <button type="button" className="context-menu-item" onClick={onContextDownload}>
-                    <span className="context-menu-icon" aria-hidden="true">
-                      <IconDownload />
-                    </span>
-                    Download
-                  </button>
-                  {isSearchActive && (
-                    <button type="button" className="context-menu-item" onClick={onContextGoToEntry}>
-                      <span className="context-menu-icon" aria-hidden="true">
-                        <IconFolder />
-                      </span>
-                      Go to file in folder
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-          </>
-        )}
-        {downloadPrompt?.open && downloadSummary && (
-          <DownloadConfirmModal
-            summary={downloadSummary}
-            onCancel={onCancelDownloadPrompt}
-            onConfirm={onConfirmDownload}
-          />
-        )}
-        {showProgressModal && (
-          <DownloadProgressModal
-            state={downloadState}
-            progressValue={progressValue}
-            progressMax={progressMax}
-            onCancel={onCancelDownload}
-            onDismiss={() => {
-              onSetSelectionMode(false);
-              onResetDownloadState();
-            }}
-          />
-        )}
-        <div className="directory-content" key={contentKey}>
-          {isSearchActive ? (
-          <>
-            {searchLoading && <div className="state">Searching...</div>}
-            {searchError && (
-              <div className="state error">
-                <div>{searchStatus.error}</div>
-                {searchStatus.retryable && onRetrySearch && (
-                  <button type="button" className="state-cta" onClick={onRetrySearch}>
-                    Retry search
-                  </button>
-                )}
-              </div>
-            )}
-            {!searchLoading && !searchError && searchCount === 0 && (
-              <div className="not-found">
-                <div className="not-found-copy">
-                  <div className="not-found-title">
-                    <span className="not-found-title-icon" aria-hidden="true">
-                      <IconSearch />
-                    </span>
-                    No results
-                  </div>
-                  <div className="not-found-subtitle">We couldn&apos;t find anything for this search.</div>
-                  <div className="not-found-desc">
-                    Try a different keyword or clear the search to return to your last folder.
-                  </div>
-                  <div className="not-found-actions">
-                    <button
-                      type="button"
-                      className="state-cta"
-                      onClick={onClearSearch}
-                    >
-                      Clear search
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-            {!searchLoading && !searchError && searchCount > 0 && (
-                <FileList
-                  entries={sortedEntries}
-                  viewMode={viewMode}
-                  onSelect={onSelect}
-                  selectedPath={selectedPath}
-                  selectionMode={selectionMode}
-                  selectedPaths={selectedPaths}
-                  onToggleSelection={onToggleSelection}
-                  onOpenContextMenu={onOpenContextMenu}
-                  zoomLevel={zoomLevel}
-                  scrollParent={panelBodyNode}
-                  useWindowScroll={useWindowScroll}
-                />
-              )}
-            </>
-          ) : (
-          <>
-            {status.loading && !status.error && <div className="state">Loading...</div>}
-            {status.error && (
-              isNotFound ? (
-                <div className="not-found">
-                  <div className="not-found-copy">
-                    <div className="not-found-title">
-                      <span className="not-found-title-icon" aria-hidden="true">
-                        <IconFolderX />
-                      </span>
-                      404
-                    </div>
-                    <div className="not-found-subtitle">You&apos;ve lost your way.</div>
-                    <div className="not-found-desc">
-                      We could not find the path you requested. Try opening the archive root or return
-                      to the last available folder.
-                    </div>
-                    <div className="not-found-actions">
-                      {status.retryable && onRetryList && (
-                        <button type="button" className="state-cta" onClick={onRetryList}>
-                          Retry
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="state-cta"
-                        onClick={() => onNavigate('')}
-                      >
-                        Go to archive root
-                      </button>
-                      {lastGoodPath !== null && lastGoodPath !== undefined && (
-                        <button
-                          type="button"
-                          className="state-cta"
-                          onClick={() => onNavigate(lastGoodPath)}
-                        >
-                          Go to last available folder
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="state error">
-                  <div>{status.error}</div>
-                  <div className="state-actions">
-                    {status.retryable && onRetryList && (
-                      <button type="button" className="state-cta" onClick={onRetryList}>
-                        Retry
-                      </button>
-                    )}
-                    {lastGoodPath !== null && lastGoodPath !== undefined && (
-                      <button
-                        type="button"
-                        className="state-cta"
-                        onClick={() => onNavigate(lastGoodPath)}
-                      >
-                        View {lastGoodPath ? lastGoodPath : rootLabel}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )
-            )}
-            {!status.loading && !status.error && entryCount === 0 && (
-              <div className="state empty">
-                <span className="state-icon" aria-hidden="true">
-                  <IconFolderOpen />
-                </span>
-                <div className="state-title">Nothing in here</div>
-              </div>
-            )}
-            {!status.loading && !status.error && entryCount > 0 && (
-                <FileList
-                  entries={sortedEntries}
-                  viewMode={viewMode}
-                  onSelect={onSelect}
-                  selectedPath={selectedPath}
-                  selectionMode={selectionMode}
-                  selectedPaths={selectedPaths}
-                  onToggleSelection={onToggleSelection}
-                  onOpenContextMenu={onOpenContextMenu}
-                  zoomLevel={zoomLevel}
-                  scrollParent={panelBodyNode}
-                  useWindowScroll={useWindowScroll}
-                />
-              )}
-            </>
-          )}
-        </div>
-      </div>
+      <DirectoryPanelHeader
+        selectionMode={selectionMode}
+        titleText={titleText}
+        subLabel={subLabel}
+        hasError={hasError}
+        sortKey={sortKey}
+        sortDir={sortDir}
+        onSortClick={handleSortClick}
+        onSetSelectionMode={onSetSelectionMode}
+      />
+      <DirectoryPanelBody
+        handlePanelBodyRef={handlePanelBodyRef}
+        contextMenu={contextMenu}
+        onCloseContextMenu={onCloseContextMenu}
+        onContextCancelSelection={onContextCancelSelection}
+        onContextSelect={onContextSelect}
+        onContextDownload={onContextDownload}
+        onContextGoToEntry={onContextGoToEntry}
+        isSearchActive={isSearchActive}
+        downloadPrompt={downloadPrompt}
+        downloadSummary={downloadSummary}
+        onCancelDownloadPrompt={onCancelDownloadPrompt}
+        onConfirmDownload={onConfirmDownload}
+        showProgressModal={showProgressModal}
+        downloadState={downloadState}
+        progressValue={progressValue}
+        progressMax={progressMax}
+        onCancelDownload={onCancelDownload}
+        onSetSelectionMode={onSetSelectionMode}
+        onResetDownloadState={onResetDownloadState}
+        contentKey={contentKey}
+        searchLoading={searchLoading}
+        searchError={searchError}
+        searchStatus={searchStatus}
+        searchCount={searchCount}
+        onRetrySearch={onRetrySearch}
+        onClearSearch={onClearSearch}
+        status={status}
+        isNotFound={isNotFound}
+        onRetryList={onRetryList}
+        onNavigate={onNavigate}
+        lastGoodPath={lastGoodPath}
+        rootLabel={rootLabel}
+        entryCount={entryCount}
+        sortedEntries={sortedEntries}
+        viewMode={viewMode}
+        onSelect={onSelect}
+        selectedPath={selectedPath}
+        selectionMode={selectionMode}
+        selectedPaths={selectedPaths}
+        onToggleSelection={onToggleSelection}
+        onOpenContextMenu={onOpenContextMenu}
+        zoomLevel={zoomLevel}
+        panelBodyNode={panelBodyNode}
+        useWindowScroll={useWindowScroll}
+      />
       {selectionMode && (
         <div
           className="selection-bar"

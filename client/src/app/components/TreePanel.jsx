@@ -5,8 +5,8 @@ import {
   IconDatabase,
   IconFolder
 } from './index.js';
-
-const TreeNode = ({ node, tree, currentPath, onToggle, onNavigate, isRoot = false, rootLabel }) => {
+const TreeNode = ({ node, tree, currentPath, onToggle, onNavigate, isRoot = false }) => {
+  const rootLabel = 'Archive';
   const isLoaded = Array.isArray(node.children);
   const hasChildren = isLoaded && node.children.length > 0;
   const canExpand = !isLoaded || hasChildren;
@@ -49,7 +49,6 @@ const TreeNode = ({ node, tree, currentPath, onToggle, onNavigate, isRoot = fals
                 currentPath={currentPath}
                 onToggle={onToggle}
                 onNavigate={onNavigate}
-                rootLabel={rootLabel}
                 isRoot={false}
               />
             );
@@ -64,7 +63,6 @@ const TreePanel = ({
   tree,
   currentPath,
   rootPath,
-  rootLabel,
   onToggle,
   onNavigate,
   onCollapseAll,
@@ -125,7 +123,6 @@ const TreePanel = ({
           currentPath={currentPath}
           onToggle={onToggle}
           onNavigate={onNavigate}
-          rootLabel={rootLabel}
           isRoot
         />
       </div>

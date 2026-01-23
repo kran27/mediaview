@@ -46,10 +46,10 @@ export const useDirectoryTree = () => {
   };
 
   const updateTreeWithEntries = (pathValue, entries, options = {}) => {
-    const { expand = false, rootLabel } = options;
+    const { expand = false } = options;
     setTree((prev) => {
       const next = { ...prev };
-      const nodeName = pathValue ? getBasename(pathValue) : rootLabel || prev['']?.name || 'Archive';
+      const nodeName = pathValue ? getBasename(pathValue) : prev['']?.name || 'Archive';
       const children = entries.filter((entry) => entry.isDir).map((entry) => entry.path);
       next[pathValue] = {
         path: pathValue,
@@ -73,10 +73,10 @@ export const useDirectoryTree = () => {
     });
   };
 
-  const expandAncestors = (pathValue, rootLabel) => {
+  const expandAncestors = (pathValue) => {
     setTree((prev) => {
       const next = { ...prev };
-      const resolvedRootLabel = rootLabel || prev['']?.name || 'Archive';
+      const resolvedRootLabel = prev['']?.name || 'Archive';
       next[''] = { ...(next[''] || {}), path: '', name: resolvedRootLabel, expanded: true };
       if (!pathValue) return next;
       const segments = pathValue.split('/').filter(Boolean);

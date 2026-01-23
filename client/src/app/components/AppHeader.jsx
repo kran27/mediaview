@@ -1,12 +1,9 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { IconClose, IconInfoCircle, IconSearch, ViewToggle } from './index.js';
+import { useViewContext } from '../contexts/index.js';
 
 const AppHeader = forwardRef(({
   onNavigateRoot,
-  viewMode,
-  onViewModeChange,
-  zoomLevel,
-  onZoomChange,
   searchQuery,
   onSearchValueChange,
   onSearchSubmit,
@@ -15,6 +12,7 @@ const AppHeader = forwardRef(({
   showFooterToggle,
   footerOpen
 }, ref) => {
+  const { viewMode, setViewMode, zoomLevel, setZoomLevel } = useViewContext();
   const inputRef = useRef(null);
   const [searchValue, setSearchValue] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -145,9 +143,9 @@ const AppHeader = forwardRef(({
         )}
         <ViewToggle
           viewMode={viewMode}
-          onChange={onViewModeChange}
+          onChange={setViewMode}
           zoomLevel={zoomLevel}
-          onZoomChange={onZoomChange}
+          onZoomChange={setZoomLevel}
         />
       </div>
     </header>

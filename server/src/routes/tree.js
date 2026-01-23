@@ -1,4 +1,3 @@
-import { ROOT_NAME } from '../config.js';
 import { getDirectoryTree } from '../lib/hash-cache.js';
 
 export const registerTreeRoute = (app) => {
@@ -7,7 +6,6 @@ export const registerTreeRoute = (app) => {
       const nodes = getDirectoryTree();
       res.setHeader('Cache-Control', 'public, max-age=60');
       res.json({
-        root: { name: ROOT_NAME, path: '' },
         nodes,
       });
     } catch (error) {

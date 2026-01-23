@@ -1,5 +1,4 @@
 import path from 'node:path';
-import { ROOT_NAME } from '../config.js';
 import { getDirectoryEntries, hasDirectoryEntry } from '../lib/hash-cache.js';
 import { isExcludedPath, isHiddenPath } from '../lib/exclude.js';
 import { decodePathSegments, sanitizeRequestPath } from '../lib/paths.js';
@@ -49,12 +48,8 @@ export const registerListRoute = (app) => {
 
     res.setHeader('Cache-Control', 'public, max-age=60');
     res.json({
-      root: {
-        name: ROOT_NAME,
-        path: '',
-      },
       current: {
-        name: requestPath ? path.posix.basename(requestPath) : ROOT_NAME,
+        name: requestPath ? path.posix.basename(requestPath) : 'Archive',
         path: requestPath,
       },
       stats,

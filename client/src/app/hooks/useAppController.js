@@ -1,0 +1,390 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { getBasename } from '../../lib/format.js';
+import { setUrlState } from '../../lib/urlState.js';
+import { useDirectoryData } from './useDirectoryData.js';
+import { useBatchDownload } from './useBatchDownload.js';
+import { useAppRouting } from './useAppRouting.js';
+import { useContextMenu } from './useContextMenu.js';
+import { useLightboxState } from './useLightboxState.js';
+import { useMediaQuery } from './useMediaQuery.js';
+
+const useAppController = () => {
+  const {
+    directory,
+    currentPath,
+    lastGoodPath,
+    status,
+    selection,
+    tree,
+    search,
+    view,
+    actions
+  } = useDirectoryData();
+  const { selected, setSelected, pendingSelection } = selection;
+  const {
+    data: treeData,
+    status: treeStatus,
+    handleToggle,
+    collapseAll,
+    expandToCurrentPath,
+    retryTree
+  } = tree;
+  const {
+    query: searchQuery,
+    submit: submitSearch,
+    clear: clearSearch,
+    results: searchResults,
+    status: searchStatus,
+    retry: retrySearch
+  } = search;
+  const {
+    mode: viewMode,
+    setMode: setViewMode,
+    zoom: zoomLevel,
+    setZoom: setZoomLevel
+  } = view;
+  const { loadDirectory } = actions;
+  const {
+    selectionMode,
+    selectedPaths,
+    selectedCount,
+    setSelectionMode,
+    toggleSelection,
+    setSelectionEntries,
+    discoverSelection,
+    downloadSelection,
+    cancelDownload,
+    resetDownloadState,
+    downloadState
+  } = useBatchDownload();
+  const [downloadPrompt, setDownloadPrompt] = useState({
+    open: false,
+    summary: null
+  });
+  const [lastBrowsePath, setLastBrowsePath] = useState('');
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [footerOpen, setFooterOpen] = useState(false);
+  const searchHeaderRef = useRef(null);
+  const layoutRef = useRef(null);
+  const loadDirectoryRef = useRef(loadDirectory);
+  const isSearchMode = Boolean(searchQuery);
+  const baseTitle = "The Mirror's Edge Archive";
+  const currentPathName = currentPath ? getBasename(currentPath) : 'Archive';
+  const pendingSelectionPath = pendingSelection || '';
+  const activeEntries = searchQuery
+    ? searchResults
+    : (directory?.entries || []);
+  const isTreeHidden = useMediaQuery('(max-width: 1100px)');
+
+  useEffect(() => {
+    loadDirectoryRef.current = loadDirectory;
+  }, [loadDirectory]);
+
+  useEffect(() => {
+    const layoutEl = layoutRef.current;
+    if (!layoutEl) return undefined;
+    if (!isTreeHidden && footerOpen) {
+      layoutEl.setAttribute('data-footer-overlay', 'true');
+    } else {
+      layoutEl.removeAttribute('data-footer-overlay');
+    }
+    return undefined;
+  }, [footerOpen, isTreeHidden]);
+
+  const handleFooterOverlayClick = useCallback(() => {
+    setFooterOpen(false);
+  }, []);
+
+  const handleToggleFooter = useCallback(() => {
+    setFooterOpen((prev) => !prev);
+  }, []);
+
+  const navigateTo = useCallback(async (pathValue, options = {}) => {
+    const {
+      selectPath = '',
+      updateUrl = true,
+      replaceUrl = false,
+      openLightbox = true
+    } = options;
+    const { selection, shouldLightbox } = await loadDirectoryRef.current(pathValue, {
+      selectPath,
+      openLightbox
+    });
+    setLightboxOpen(shouldLightbox);
+    if (updateUrl) {
+      setUrlState(
+        {
+          path: pathValue,
+          preview: shouldLightbox && selection ? selection.name : ''
+        },
+        { replace: replaceUrl }
+      );
+    }
+  }, [setLightboxOpen]);
+
+  const {
+    clearSearchState,
+    handleSearchValueChange,
+    hasSearchState,
+    handleSearchSubmit,
+    handleCloseSearch
+  } = useAppRouting({
+    baseTitle,
+    currentPath,
+    currentPathName,
+    searchQuery,
+    searchHeaderRef,
+    clearSearch,
+    submitSearch,
+    navigateTo,
+    setLightboxOpen,
+    lastBrowsePath,
+    setLastBrowsePath
+  });
+
+  const handleNavigate = useCallback((pathValue, options = {}) => {
+    if (hasSearchState()) {
+      clearSearchState();
+    }
+    return navigateTo(pathValue, options);
+  }, [clearSearchState, hasSearchState, navigateTo]);
+
+  const handleNavigateRoot = useCallback(() => {
+    if (hasSearchState()) {
+      clearSearchState();
+    }
+    void navigateTo('');
+  }, [clearSearchState, hasSearchState, navigateTo]);
+
+  const {
+    selectedEntry,
+    lightboxEntries,
+    activeLightboxIndex,
+    handleOpen,
+    handleClose,
+    handlePrev,
+    handleNext,
+    handleNavigateFromLightbox
+  } = useLightboxState({
+    entries: activeEntries,
+    currentPath,
+    isSearchMode,
+    selected,
+    setSelected,
+    onNavigate: handleNavigate,
+    lightboxOpen,
+    setLightboxOpen
+  });
+
+  const handleRequestDownload = useCallback(async () => {
+    const summary = await discoverSelection();
+    if (summary) {
+      setDownloadPrompt({ open: true, summary });
+    }
+  }, [discoverSelection]);
+
+  const handleConfirmDownload = useCallback(() => {
+    if (!downloadPrompt.summary) return;
+    downloadSelection(null, downloadPrompt.summary);
+    setDownloadPrompt({ open: false, summary: null });
+  }, [downloadPrompt.summary, downloadSelection]);
+
+  const handleCancelDownloadPrompt = useCallback(() => {
+    setDownloadPrompt({ open: false, summary: null });
+  }, []);
+
+  const {
+    contextMenu,
+    openContextMenu,
+    closeContextMenu,
+    handleContextSelect,
+    handleContextDownload,
+    handleContextCancelSelection,
+    handleContextGoToEntry
+  } = useContextMenu({
+    setSelectionMode,
+    setSelectionEntries,
+    discoverSelection,
+    setDownloadPrompt,
+    onNavigateToEntry: handleNavigateFromLightbox
+  });
+
+  useEffect(() => {
+    if (selectionMode) {
+      setSelected(null);
+    }
+  }, [selectionMode, setSelected]);
+
+  const handleRetryList = useCallback(() => {
+    void loadDirectory(currentPath, { force: true });
+  }, [currentPath, loadDirectory]);
+
+  const handleRetryConnection = useCallback(() => {
+    retryTree?.();
+    void loadDirectory(currentPath, { force: true });
+  }, [currentPath, loadDirectory, retryTree]);
+  const showConnectionLightbox = (
+    ((status.error && status.retryable) || (treeStatus.error && treeStatus.retryable))
+    && !status.loading
+    && !treeStatus.loading
+  );
+
+  const directoryDataValue = useMemo(() => ({
+    directory,
+    currentPath,
+    currentPathName,
+    status,
+    lastGoodPath,
+    entries: activeEntries,
+    useWindowScroll: isTreeHidden
+  }), [
+    activeEntries,
+    currentPath,
+    currentPathName,
+    directory,
+    isTreeHidden,
+    lastGoodPath,
+    status
+  ]);
+
+  const directoryActionsValue = useMemo(() => ({
+    onSelect: handleOpen,
+    onNavigate: handleNavigate,
+    onRetryList: handleRetryList
+  }), [handleNavigate, handleOpen, handleRetryList]);
+
+  const selectionStateValue = useMemo(() => ({
+    selectedPath: selectionMode ? '' : (selected?.path || pendingSelectionPath),
+    selectionMode,
+    selectedPaths,
+    selectedCount
+  }), [
+    pendingSelectionPath,
+    selected,
+    selectedCount,
+    selectedPaths,
+    selectionMode
+  ]);
+
+  const selectionActionsValue = useMemo(() => ({
+    onToggleSelection: toggleSelection,
+    onSetSelectionMode: setSelectionMode
+  }), [setSelectionMode, toggleSelection]);
+
+  const downloadStateValue = useMemo(() => ({
+    downloadState,
+    downloadPrompt
+  }), [downloadPrompt, downloadState]);
+
+  const downloadActionsValue = useMemo(() => ({
+    onRequestDownload: handleRequestDownload,
+    onConfirmDownload: handleConfirmDownload,
+    onCancelDownloadPrompt: handleCancelDownloadPrompt,
+    onCancelDownload: cancelDownload,
+    onResetDownloadState: resetDownloadState
+  }), [
+    cancelDownload,
+    handleCancelDownloadPrompt,
+    handleConfirmDownload,
+    handleRequestDownload,
+    resetDownloadState
+  ]);
+
+  const contextMenuValue = useMemo(() => ({
+    contextMenu,
+    onOpenContextMenu: openContextMenu,
+    onCloseContextMenu: closeContextMenu,
+    onContextSelect: handleContextSelect,
+    onContextDownload: handleContextDownload,
+    onContextCancelSelection: handleContextCancelSelection,
+    onContextGoToEntry: handleContextGoToEntry
+  }), [
+    closeContextMenu,
+    contextMenu,
+    handleContextCancelSelection,
+    handleContextDownload,
+    handleContextGoToEntry,
+    handleContextSelect,
+    openContextMenu
+  ]);
+
+  const searchStateValue = useMemo(() => ({
+    searchQuery,
+    searchResults,
+    searchStatus
+  }), [searchQuery, searchResults, searchStatus]);
+
+  const searchActionsValue = useMemo(() => ({
+    onRetrySearch: retrySearch,
+    onClearSearch: handleCloseSearch
+  }), [handleCloseSearch, retrySearch]);
+
+  const viewValue = useMemo(() => ({
+    viewMode,
+    setViewMode,
+    zoomLevel,
+    setZoomLevel
+  }), [setViewMode, setZoomLevel, viewMode, zoomLevel]);
+
+  return {
+    viewValue,
+    appChromeProps: {
+      onNavigateRoot: handleNavigateRoot,
+      searchQuery,
+      searchHeaderRef,
+      onSearchValueChange: handleSearchValueChange,
+      onSearchSubmit: handleSearchSubmit,
+      onSearchClear: handleCloseSearch,
+      onToggleFooter: handleToggleFooter,
+      showFooterToggle: !isTreeHidden,
+      footerOpen,
+      breadcrumbsPath: status.error ? lastGoodPath : currentPath,
+      onNavigate: handleNavigate,
+      isPathStale: Boolean(status.error)
+    },
+    providerValues: {
+      directoryDataValue,
+      directoryActionsValue,
+      selectionStateValue,
+      selectionActionsValue,
+      downloadStateValue,
+      downloadActionsValue,
+      contextMenuValue,
+      searchStateValue,
+      searchActionsValue
+    },
+    panelsProps: {
+      layoutRef,
+      tree: treeData,
+      treeCurrentPath: searchQuery ? null : currentPath,
+      onToggleTree: handleToggle,
+      onCollapseAll: collapseAll,
+      onExpandCurrent: expandToCurrentPath,
+      onNavigate: handleNavigate,
+      treeStatus,
+      onRetryTree: retryTree,
+      onFooterOverlayClick: handleFooterOverlayClick
+    },
+    overlaysProps: {
+      connectionLightboxProps: {
+        open: showConnectionLightbox,
+        onRetry: handleRetryConnection
+      },
+      lightboxProps: {
+        open: lightboxOpen,
+        selectedEntry,
+        lightboxEntries,
+        activeIndex: activeLightboxIndex,
+        onClose: handleClose,
+        onPrev: handlePrev,
+        onNext: handleNext,
+        showPath: true,
+        onNavigatePath: handleNavigateFromLightbox
+      }
+    },
+    isTreeHidden,
+    footerOpen
+  };
+};
+
+export { useAppController };

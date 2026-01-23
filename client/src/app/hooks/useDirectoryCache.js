@@ -4,6 +4,8 @@ import { createRequestError, normalizeRequestError } from '../../lib/request.js'
 import { getBasename } from '../../lib/format.js';
 import { buildStats } from '../../lib/stats.js';
 
+const DEFAULT_ROOT_LABEL = 'Archive';
+
 const encodePathSegments = (pathValue) =>
   pathValue
     .split('/')
@@ -31,16 +33,13 @@ export const useDirectoryCache = ({ updateTreeWithEntries }) => {
   const applyListing = (pathValue, data, options = {}) => {
     cacheRef.current.set(pathValue, data);
     updateTreeWithEntries(pathValue, data.entries, {
-      expand: options.expand ?? true,
-      rootLabel: data.root?.name
+      expand: options.expand ?? true
     });
     if (data.children) {
-      const rootLabel = data.root?.name;
       Object.entries(data.children).forEach(([childPath, childEntries]) => {
         if (!Array.isArray(childEntries)) return;
-        const childName = childPath ? getBasename(childPath) : rootLabel || 'Archive';
+        const childName = childPath ? getBasename(childPath) : DEFAULT_ROOT_LABEL;
         const childData = {
-          root: data.root,
           current: {
             name: childName,
             path: childPath
@@ -50,8 +49,7 @@ export const useDirectoryCache = ({ updateTreeWithEntries }) => {
         };
         cacheRef.current.set(childPath, childData);
         updateTreeWithEntries(childPath, childEntries, {
-          expand: false,
-          rootLabel
+          expand: false
         });
       });
     }
@@ -112,8 +110,7 @@ export const useDirectoryCache = ({ updateTreeWithEntries }) => {
       const cached = getCachedListing(chainPath);
       if (!cached) return;
       updateTreeWithEntries(chainPath, cached.entries, {
-        expand: true,
-        rootLabel: cached.root?.name
+        expand: true
       });
     });
 
@@ -134,8 +131,7 @@ export const useDirectoryCache = ({ updateTreeWithEntries }) => {
         const cachedNext = getCachedListing(nextPath);
         if (cachedNext) {
           updateTreeWithEntries(nextPath, cachedNext.entries, {
-            expand: true,
-            rootLabel: cachedNext.root?.name
+            expand: true
           });
         }
         index += 2;

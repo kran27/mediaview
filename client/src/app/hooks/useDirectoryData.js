@@ -120,7 +120,7 @@ export const useDirectoryData = () => {
       }
       setPendingSelection('');
     }
-    expandAncestors(pathValue, data.root?.name || 'Archive');
+    expandAncestors(pathValue);
     setStatus({ loading: false, error: null, retryable: false, code: null });
   };
 
@@ -135,7 +135,7 @@ export const useDirectoryData = () => {
     }
     const cached = getCachedListing(pathValue);
     if (!cached && pathValue && treeHydratedRef.current) {
-      expandAncestors(pathValue, tree['']?.name || 'Archive');
+      expandAncestors(pathValue);
     }
     if (cached && !force) {
       const selection = getSelection(cached.entries, selectPath);
@@ -153,7 +153,7 @@ export const useDirectoryData = () => {
     setStatus({ loading: true, error: null, retryable: false, code: null });
     setCurrentPath(pathValue);
     if (pathValue && treeHydratedRef.current) {
-      expandAncestors(pathValue, tree['']?.name || 'Archive');
+      expandAncestors(pathValue);
     }
     try {
       const listPromise = fetchList(pathValue, { force });
@@ -302,26 +302,36 @@ export const useDirectoryData = () => {
     directory,
     currentPath,
     lastGoodPath,
-    selected,
-    setSelected,
-    pendingSelection,
     status,
-    tree,
-    treeStatus,
-    searchQuery,
-    submitSearch,
-    clearSearch,
-    searchResults,
-    searchStatus,
-    retrySearch,
-    viewMode,
-    setViewMode,
-    zoomLevel,
-    setZoomLevel,
-    loadDirectory,
-    handleToggle,
-    collapseAll,
-    expandToCurrentPath,
-    retryTree
+    selection: {
+      selected,
+      setSelected,
+      pendingSelection
+    },
+    tree: {
+      data: tree,
+      status: treeStatus,
+      handleToggle,
+      collapseAll,
+      expandToCurrentPath,
+      retryTree
+    },
+    search: {
+      query: searchQuery,
+      submit: submitSearch,
+      clear: clearSearch,
+      results: searchResults,
+      status: searchStatus,
+      retry: retrySearch
+    },
+    view: {
+      mode: viewMode,
+      setMode: setViewMode,
+      zoom: zoomLevel,
+      setZoom: setZoomLevel
+    },
+    actions: {
+      loadDirectory
+    }
   };
 };

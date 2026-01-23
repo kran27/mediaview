@@ -4,6 +4,7 @@ import { IconDatabase } from './index.js';
 const Breadcrumbs = ({ path, onNavigate, searchQuery, isPathStale = false }) => {
   const scrollRef = useRef(null);
   const segments = path ? path.split('/') : [];
+  const rootLabel = 'Archive';
 
   useEffect(() => {
     const node = scrollRef.current;
@@ -39,10 +40,10 @@ const Breadcrumbs = ({ path, onNavigate, searchQuery, isPathStale = false }) => 
           className={`crumb is-home ${isRootCurrent ? 'current' : ''}`}
           type="button"
           onClick={() => onNavigate('')}
-          aria-label="Archive"
+          aria-label={rootLabel}
         >
           <IconDatabase />
-          <span className="crumb-label">Archive</span>
+          <span className="crumb-label">{rootLabel}</span>
         </button>
         {isSearchActive && (
           <span className="crumb-segment">
