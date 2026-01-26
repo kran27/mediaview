@@ -11,34 +11,22 @@ import { getHashEntry, hasHashEntry } from '../lib/hash-cache.js';
 import { getThumbPath } from '../lib/thumbnails.js';
 
 const parseThumbnailRequest = (req) => {
-  if (
-    typeof req.params.size === 'string' &&
-    (typeof req.params.path === 'string' || Array.isArray(req.params.path))
-  ) {
-    return {
-      requestPath: decodePathSegments(req.params.path),
-      size: req.params.size,
-    };
-  }
-  if (typeof req.params.path === 'string' || Array.isArray(req.params.path)) {
-    const decoded = decodePathSegments(req.params.path);
-    const segments = decoded.split('/').filter(Boolean);
-    const leading = segments[0] ? segments[0].toLowerCase() : '';
-    if (leading && THUMB_SIZES[leading]) {
-      return { requestPath: segments.slice(1).join('/'), size: leading };
+  if (typeof req.params.size === 'string' && (typeof req.params.path === 'string' || Array.isArray(req.params.path))) {
+    const rawSize = req.params.size.toString().toLowerCase();
+    const decodedPath = decodePathSegments(req.params.path);
+    if (rawSize === 'jpg') {
+      return { requestPath: decodedPath, size: 'md', format: 'jpg' };
     }
-    const trailing = segments[segments.length - 1]
-      ? segments[segments.length - 1].toLowerCase()
-      : '';
-    if (trailing && THUMB_SIZES[trailing]) {
-      return { requestPath: segments.slice(0, -1).join('/'), size: trailing };
+    if (THUMB_SIZES[rawSize]) {
+      return { requestPath: decodedPath, size: rawSize };
     }
-    return { requestPath: decoded, size: String(req.query.size || 'sm') };
+    const err = new Error('Invalid thumbnail size');
+    err.statusCode = 400;
+    throw err;
   }
-  if (typeof req.query.path === 'string') {
-    return { requestPath: req.query.path, size: String(req.query.size || 'sm') };
-  }
-  return { requestPath: '', size: String(req.query.size || 'sm') };
+  const err = new Error('Missing size');
+  err.statusCode = 400;
+  throw err;
 };
 
 export const registerThumbnailRoute = (app) => {
@@ -90,7 +78,10 @@ export const registerThumbnailRoute = (app) => {
         return;
       }
       const hash = cached.hash;
-      const thumbPath = getThumbPath(hash, size, path.basename(requestPath));
+      const format = parsed.format || '';
+      const thumbPath = format === 'jpg'
+        ? getThumbPath(hash, size, path.basename(requestPath), '.jpg')
+        : getThumbPath(hash, size, path.basename(requestPath));
       if (!fs.existsSync(thumbPath)) {
         res.status(404).json({ error: 'Thumbnail not found' });
         return;
@@ -115,7 +106,5 @@ export const registerThumbnailRoute = (app) => {
     }
   };
 
-  app.get('/api/thumbnail', handleRequest);
   app.get('/api/thumbnail/:size/*path', handleRequest);
-  app.get('/api/thumbnail/*path', handleRequest);
 };

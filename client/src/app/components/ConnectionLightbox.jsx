@@ -2,7 +2,6 @@ import { IconWifiOff } from './index.js';
 
 const ConnectionLightbox = ({ open, onRetry }) => {
   if (!open) return null;
-  const rootLabel = 'Archive';
   return (
     <div className="connection-lightbox" role="alertdialog" aria-modal="true">
       <div className="connection-lightbox-card">
@@ -11,7 +10,7 @@ const ConnectionLightbox = ({ open, onRetry }) => {
         </div>
         <div className="connection-lightbox-title">Connection error</div>
         <div className="connection-lightbox-copy">
-          We couldn&apos;t reach {rootLabel} services. Check your connection and try again.
+          We couldn&apos;t reach The Mirror&apos;s Edge Archive services. Check your connection and try again.
         </div>
         <div className="connection-lightbox-actions">
           <button type="button" className="connection-lightbox-button" onClick={onRetry}>

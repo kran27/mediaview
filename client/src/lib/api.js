@@ -16,6 +16,9 @@ export const buildFileUrl = (pathValue) => {
 
 export const buildThumbUrl = (pathValue, size = 'sm') => {
   const encodedPath = encodePathSegments(pathValue || '');
+  if (size === 'jpg') {
+    return `${API_BASE}/api/thumbnail/jpg/${encodedPath}`;
+  }
   return `${API_BASE}/api/thumbnail/${size}/${encodedPath}`;
 };
 

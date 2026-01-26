@@ -40,7 +40,7 @@ const ThumbStack = ({
     <div className={wrapperClassName}>
       <img
         className={imgClassName}
-        src={buildThumbUrl(entry.path, 'sm')}
+        src={buildThumbUrl(entry.path, 'jpg')}
         srcSet={buildThumbSrcSet(entry.path)}
         alt=""
         sizes={sizes}

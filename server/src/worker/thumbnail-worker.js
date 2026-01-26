@@ -49,17 +49,34 @@ const deleteThumbFiles = async (relativePath, hash) => {
   let deletedCount = 0;
   await Promise.all(
     sizeEntries.map(([variant]) => {
-      const thumbName = `${hash}-${variant}-${originalName}${thumbExt}`;
-      const thumbPath = path.join(thumbDir, thumbName);
-      return fsPromises
-        .unlink(thumbPath)
-        .then(() => {
-          deletedCount += 1;
-        })
-        .catch((error) => {
-          if (error?.code === 'ENOENT') return;
-          console.error(`Thumbnail worker failed to delete thumbnail for ${relativePath}`, error);
-        });
+      const attempts = [];
+      const avifName = `${hash}-${variant}-${originalName}${thumbExt}`;
+      const avifPath = path.join(thumbDir, avifName);
+      attempts.push(
+        fsPromises
+          .unlink(avifPath)
+          .then(() => {
+            deletedCount += 1;
+          })
+          .catch((error) => {
+            if (error?.code === 'ENOENT') return;
+            console.error(`Thumbnail worker failed to delete thumbnail for ${relativePath}`, error);
+          })
+      );
+      const jpgName = `${hash}-${variant}-${originalName}.jpg`;
+      const jpgPath = path.join(thumbDir, jpgName);
+      attempts.push(
+        fsPromises
+          .unlink(jpgPath)
+          .then(() => {
+            deletedCount += 1;
+          })
+          .catch((error) => {
+            if (error?.code === 'ENOENT') return;
+            console.error(`Thumbnail worker failed to delete jpg thumbnail for ${relativePath}`, error);
+          })
+      );
+      return Promise.all(attempts);
     })
   );
   return deletedCount;
@@ -135,11 +152,24 @@ const generateThumbnails = async (relativePath, hash, options = {}) => {
         const thumbName = `${cachedHash}-${variant}-${originalName}${thumbExt}`;
         return !fs.existsSync(path.join(thumbDir, thumbName));
       });
-  if (variants.length === 0) {
-    return { hash: cachedHash, created: 0 };
-  }
-
   let created = 0;
+  if (variants.length === 0) {
+    const mdEntry = sizeEntries.find(([v]) => v === 'md');
+    if (mdEntry) {
+      const [, width] = mdEntry;
+      const height = getThumbHeight(width);
+      const jpgName = `${cachedHash}-md-${originalName}.jpg`;
+      const jpgPath = path.join(thumbDir, jpgName);
+      if (options.force || !fs.existsSync(jpgPath)) {
+        await sharp(absolutePath)
+          .resize({ width, height, fit: 'cover', position: 'centre' })
+          .jpeg({ quality: 80 })
+          .toFile(jpgPath);
+        created += 1;
+      }
+    }
+    return { hash: cachedHash, created };
+  }
   for (const [variant, width] of variants) {
     const height = getThumbHeight(width);
     const thumbName = `${cachedHash}-${variant}-${originalName}${thumbExt}`;
@@ -149,6 +179,21 @@ const generateThumbnails = async (relativePath, hash, options = {}) => {
       .avif({ quality: 50, effort: 6, chromaSubsampling: '4:2:0' })
       .toFile(thumbPath);
     created += 1;
+  }
+
+  const mdEntry = sizeEntries.find(([v]) => v === 'md');
+  if (mdEntry) {
+    const [, mdWidth] = mdEntry;
+    const mdHeight = getThumbHeight(mdWidth);
+    const jpgName = `${cachedHash}-md-${originalName}.jpg`;
+    const jpgPath = path.join(thumbDir, jpgName);
+    if (options.force || !fs.existsSync(jpgPath)) {
+      await sharp(absolutePath)
+        .resize({ width: mdWidth, height: mdHeight, fit: 'cover', position: 'centre' })
+        .jpeg({ quality: 80 })
+        .toFile(jpgPath);
+      created += 1;
+    }
   }
 
   return { hash: cachedHash, created };
@@ -235,7 +280,24 @@ const generateVideoThumbnails = async (relativePath, hash, options = {}) => {
         return !fs.existsSync(path.join(thumbDir, thumbName));
       });
   if (variants.length === 0) {
-    return { hash: cachedHash, created: 0 };
+    // If no avif variants need creating, ensure medium JPG exists.
+    const mdEntry = sizeEntries.find(([v]) => v === 'md');
+    let created = 0;
+    if (mdEntry) {
+      const [, width] = mdEntry;
+      const height = getThumbHeight(width);
+      const jpgName = `${cachedHash}-md-${originalName}.jpg`;
+      const jpgPath = path.join(thumbDir, jpgName);
+      if (options.force || !fs.existsSync(jpgPath)) {
+        const frameBuffer = await extractVideoFrame(absolutePath);
+        await sharp(frameBuffer)
+          .resize({ width, height, fit: 'cover', position: 'centre' })
+          .jpeg({ quality: 80 })
+          .toFile(jpgPath);
+        created += 1;
+      }
+    }
+    return { hash: cachedHash, created };
   }
   const frameBuffer = await extractVideoFrame(absolutePath);
 
@@ -249,6 +311,22 @@ const generateVideoThumbnails = async (relativePath, hash, options = {}) => {
       .avif({ quality: 50, effort: 6, chromaSubsampling: '4:2:0' })
       .toFile(thumbPath);
     created += 1;
+  }
+
+  // Ensure medium JPG fallback exists for videos as well.
+  const mdEntry = sizeEntries.find(([v]) => v === 'md');
+  if (mdEntry) {
+    const [, mdWidth] = mdEntry;
+    const mdHeight = getThumbHeight(mdWidth);
+    const jpgName = `${cachedHash}-md-${originalName}.jpg`;
+    const jpgPath = path.join(thumbDir, jpgName);
+    if (options.force || !fs.existsSync(jpgPath)) {
+      await sharp(frameBuffer)
+        .resize({ width: mdWidth, height: mdHeight, fit: 'cover', position: 'centre' })
+        .jpeg({ quality: 80 })
+        .toFile(jpgPath);
+      created += 1;
+    }
   }
 
   return { hash: cachedHash, created };

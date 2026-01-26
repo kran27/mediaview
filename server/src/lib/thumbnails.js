@@ -33,11 +33,13 @@ const ensureThumbDir = async () => {
   }
 };
 
-export const getThumbName = (hash, variant, originalName) =>
-  `${hash}-${variant}-${originalName}${THUMB_EXT}`;
+export const getThumbName = (hash, variant, originalName, ext = THUMB_EXT) => {
+  const normalized = ext.startsWith('.') ? ext : `.${ext}`;
+  return `${hash}-${variant}-${originalName}${normalized}`;
+};
 
-export const getThumbPath = (hash, variant, originalName) =>
-  path.join(THUMB_DIR, getThumbName(hash, variant, originalName));
+export const getThumbPath = (hash, variant, originalName, ext = THUMB_EXT) =>
+  path.join(THUMB_DIR, getThumbName(hash, variant, originalName, ext));
 
 export const enqueueThumbnailJobs = (paths) => {
   if (thumbnailWorkers.length === 0 || paths.length === 0) return;
