@@ -320,7 +320,7 @@ const FileList = ({
             })}
           </div>
         )}
-        {gridReady && (
+        {gridReady && files.length > 0 && (
           <VirtuosoGrid
             ref={gridRef}
             data={files}
