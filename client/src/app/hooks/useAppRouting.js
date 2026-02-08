@@ -2,6 +2,18 @@ import { useEffect, useRef } from 'react';
 import { setUrlState } from '../../lib/urlState.js';
 import { useUrlSync } from './useUrlSync.js';
 
+const setMetaTagContent = (attributeName, attributeValue, content) => {
+  if (!content) return;
+  const selector = `meta[${attributeName}="${attributeValue}"]`;
+  let metaTag = document.head?.querySelector(selector);
+  if (!metaTag) {
+    metaTag = document.createElement('meta');
+    metaTag.setAttribute(attributeName, attributeValue);
+    document.head?.appendChild(metaTag);
+  }
+  metaTag.setAttribute('content', content);
+};
+
 const useAppRouting = ({
   baseTitle,
   currentPath,
@@ -23,15 +35,23 @@ const useAppRouting = ({
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
-    if (searchQuery) {
-      document.title = `${baseTitle} - Search for "${searchQuery}"`;
-      return;
-    }
-    if (!currentPath) {
-      document.title = baseTitle;
-      return;
-    }
-    document.title = `${baseTitle} - ${currentPathName}`;
+    const pageTitle = searchQuery
+      ? `${baseTitle} - Search for "${searchQuery}"`
+      : (!currentPath ? baseTitle : `${baseTitle} - ${currentPathName}`);
+    const description = baseTitle;
+    const origin = window.location.origin;
+    const pathname = window.location.pathname;
+    const url = `${origin}${pathname}`;
+    const image = `${origin}/icon-192.png`;
+
+    document.title = pageTitle;
+    setMetaTagContent('property', 'og:title', pageTitle);
+    setMetaTagContent('property', 'og:description', description);
+    setMetaTagContent('property', 'og:image', image);
+    setMetaTagContent('property', 'og:url', url);
+    setMetaTagContent('name', 'twitter:title', pageTitle);
+    setMetaTagContent('name', 'twitter:description', description);
+    setMetaTagContent('name', 'twitter:image', image);
   }, [baseTitle, currentPath, currentPathName, searchQuery]);
 
   const clearSearchState = () => {

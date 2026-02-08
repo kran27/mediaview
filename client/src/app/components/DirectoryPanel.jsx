@@ -672,6 +672,14 @@ const DirectoryPanel = () => {
     }
   }, [currentPath, isSearchActive]);
 
+  useEffect(() => {
+    if (isSearchActive) return;
+    if (!useWindowScroll) return;
+    if (selectionMode) return;
+    if (selectedPath) return;
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [currentPath, isSearchActive, selectedPath, selectionMode, useWindowScroll]);
+
   return (
     <div
       className={`panel list-panel${selectionMode ? ' selection-active' : ''}${hasError ? ' has-error' : ''}`}

@@ -8,9 +8,12 @@ import {
   HASH_CACHE_SCAN_INTERVAL_MS,
   ROOT_DIR,
   ROOT_NAME,
+  SITE_ORIGIN,
+  SITEMAP_FILE,
 } from '../config.js';
-import { isHiddenPath } from './exclude.js';
+import { isExcludedPath, isHiddenPath } from './exclude.js';
 import { classifyFile } from './classify.js';
+import { writeSitemap } from './sitemap.js';
 
 export const HASH_CACHE_DIR = CACHE_ROOT;
 export const HASH_CACHE_FILE = path.join(HASH_CACHE_DIR, 'file-hashes.json');
@@ -32,6 +35,7 @@ let unsubscribeWorkerUpdates = null;
 let dirtyGeneration = 0;
 let flushedGeneration = 0;
 let cacheLoaded = false;
+let cacheEpoch = 0;
 const cacheStatus = {
   lastScanStart: null,
   lastScanEnd: null,
@@ -39,6 +43,7 @@ const cacheStatus = {
   lastScanUpdates: 0,
   lastScanRemovals: 0,
 };
+let sitemapHash = null;
 const pendingThumbUpdates = new Map();
 const pendingThumbRemovals = new Map();
 const CACHE_WATCH_DEBOUNCE_MS = 200;
@@ -158,6 +163,11 @@ const writeCacheFile = async () => {
     const tmpPath = `${HASH_CACHE_FILE}.tmp`;
     await fsPromises.writeFile(tmpPath, payload, 'utf8');
     await fsPromises.rename(tmpPath, HASH_CACHE_FILE);
+    try {
+      await writeSitemapIfChanged();
+    } catch (error) {
+      console.error('Failed to write sitemap', error);
+    }
     flushedGeneration = targetGeneration;
   } catch (error) {
     console.error('Failed to write hash cache', error);
@@ -310,6 +320,15 @@ export const loadHashCache = async () => {
   } finally {
     cacheLoaded = loaded;
   }
+  if (loaded) {
+    cacheEpoch += 1;
+    sitemapHash = null;
+    try {
+      await writeSitemapIfChanged();
+    } catch (error) {
+      console.error('Failed to write sitemap', error);
+    }
+  }
   return loaded;
 };
 
@@ -459,6 +478,8 @@ export const startHashCacheWorker = async () => {
         cacheStatus.lastScanDurationMs = message.finishedAt - message.startedAt;
         cacheStatus.lastScanUpdates = message.updatedCount || 0;
         cacheStatus.lastScanRemovals = message.removedCount || 0;
+        cacheEpoch += 1;
+        sitemapHash = null;
         const { updates, removals } = flushThumbQueue();
         scanListeners.forEach((listener) =>
           listener({
@@ -540,6 +561,28 @@ export const getHashCacheStatus = () => ({
     removals: cacheStatus.lastScanRemovals,
   },
 });
+
+export const getCacheGeneration = () => dirtyGeneration;
+export const getCacheEpoch = () => cacheEpoch;
+
+const writeSitemapIfChanged = async () => {
+  const directories = [...ENTRY_INDEX.entries()]
+    .filter(([pathValue, entry]) => (
+      entry?.isDir &&
+      !isHiddenPath(pathValue) &&
+      !isExcludedPath(pathValue)
+    ))
+    .map(([pathValue]) => pathValue);
+  const nextHash = directories.join('\n');
+  if (nextHash === sitemapHash) return;
+  await writeSitemap({
+    directories,
+    targetPath: SITEMAP_FILE,
+    baseUrl: SITE_ORIGIN,
+    gzip: true,
+  });
+  sitemapHash = nextHash;
+};
 
 const DEFAULT_SEARCH_LIMIT = 100;
 const SEARCH_CHUNK_SIZE = 500;

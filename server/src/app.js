@@ -10,10 +10,15 @@ import { registerListRoute } from './routes/list.js';
 import { registerSearchRoute } from './routes/search.js';
 import { registerTreeRoute } from './routes/tree.js';
 import { registerThumbnailRoute } from './routes/thumbnail.js';
+import { registerSitemapRoute } from './routes/sitemap.js';
 import { isExcludedPath } from './lib/exclude.js';
-import { hasHashEntry } from './lib/hash-cache.js';
+import { getCacheEpoch, hasHashEntry } from './lib/hash-cache.js';
 import { CLIENT_DIST } from './config.js';
 import { decodePathSegments, sanitizeRequestPath } from './lib/paths.js';
+import { createIndexHtmlRenderer } from './lib/html-meta.js';
+import { buildNoscriptDirectoryList } from './lib/noscript-list.js';
+
+const BASE_TITLE = "The Mirror's Edge Archive";
 
 export const createApp = () => {
   const app = express();
@@ -55,6 +60,7 @@ export const createApp = () => {
   registerSearchRoute(app);
   registerTreeRoute(app);
   registerThumbnailRoute(app);
+  registerSitemapRoute(app);
 
   const shouldHandleFile = (requestPath) => {
     if (!requestPath) return false;
@@ -81,7 +87,14 @@ export const createApp = () => {
     await handleFileRequest(req, res, requestPath);
   });
 
-  if (process.env.NODE_ENV === 'production' && fs.existsSync(CLIENT_DIST)) {
+  if (fs.existsSync(CLIENT_DIST)) {
+    const indexHtmlPath = path.join(CLIENT_DIST, 'index.html');
+    const indexHtmlTemplate = fs.readFileSync(indexHtmlPath, 'utf-8');
+    const renderIndexHtml = createIndexHtmlRenderer(indexHtmlTemplate, {
+      baseTitle: BASE_TITLE,
+      getNoscriptContent: (req) => buildNoscriptDirectoryList(req),
+      getCacheEpoch,
+    });
     const assetCacheControl = (res, filePath) => {
       if (filePath.endsWith('.html')) {
         res.setHeader('Cache-Control', 'no-cache');
@@ -93,7 +106,10 @@ export const createApp = () => {
     app.use(express.static(CLIENT_DIST, { index: false, setHeaders: assetCacheControl }));
 
     app.get('/', (req, res) => {
-      res.sendFile(path.join(CLIENT_DIST, 'index.html'));
+      const html = renderIndexHtml(req);
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.send(html);
     });
 
     app.get('/*path', (req, res, next) => {
@@ -101,7 +117,10 @@ export const createApp = () => {
         next();
         return;
       }
-      res.sendFile(path.join(CLIENT_DIST, 'index.html'));
+      const html = renderIndexHtml(req);
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.send(html);
     });
   }
 

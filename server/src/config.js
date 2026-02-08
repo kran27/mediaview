@@ -13,6 +13,8 @@ export const THUMB_DIR = path.join(CACHE_ROOT, 'thumbnails');
 export const CLIENT_DIST = process.env.CLIENT_DIST
   ? path.resolve(process.env.CLIENT_DIST)
   : path.resolve(process.cwd(), '../client/dist');
+export const SITEMAP_FILE = path.join(CACHE_ROOT, 'sitemap.xml');
+export const SITE_ORIGIN = process.env.SITE_ORIGIN || '';
 export const THUMB_EXT = '.avif';
 export const THUMB_SIZES = {
   sm: 200,

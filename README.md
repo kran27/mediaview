@@ -76,13 +76,15 @@ match `/folder-1/unlisted/file.jpg` and `/folder-2/unlisted_img.jpg`.
 1. Build the client:
 
 ```bash
-cd server
+cd client
+npm install
 npm run build
 ```
 
 2. Start the server in production mode:
 
 ```bash
+cd server
 NODE_ENV=production npm start
 ```
 
@@ -95,6 +97,12 @@ Set these as Vite env variables (e.g., `client/.env.local` or your shell) and re
 
 - `VITE_API_BASE`: Base URL for API requests (default: empty, same origin).
 - `VITE_SHOW_STAGING`: Toggle the `STAGING` label in the header (`true`/`false`, default: `true`).
+
+## Server configuration
+
+Optional environment variables:
+
+- `SITE_ORIGIN`: Base origin for sitemap URLs (example: `https://archive.example.com`). If unset, the sitemap uses relative paths.
 
 ## Docker
 
@@ -152,4 +160,4 @@ Use `server` or `worker` to override the default `combined` mode.
 - Thumbnails and hashes are stored in `CACHE_ROOT`.
 - Video thumbnail generation requires `ffmpeg` to additionally be installed and available on PATH.
 - List, tree, and search responses are cached for 60 seconds; thumbnails are cached for 6 hours.
-- For production, build the client (`npm run build`) and serve it with your static server of choice.
+- For production, build the client (`cd client && npm run build`) and serve it with your static server of choice.
