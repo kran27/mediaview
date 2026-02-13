@@ -47,6 +47,7 @@ let sitemapHash = null;
 const pendingThumbUpdates = new Map();
 const pendingThumbRemovals = new Map();
 const CACHE_WATCH_DEBOUNCE_MS = 200;
+const shouldWriteSitemap = () => process.env.MEDIAVIEW_MODE !== 'server';
 
 const getParentPath = (relativePath) => {
   if (!relativePath) return null;
@@ -566,6 +567,7 @@ export const getCacheGeneration = () => dirtyGeneration;
 export const getCacheEpoch = () => cacheEpoch;
 
 const writeSitemapIfChanged = async () => {
+  if (!shouldWriteSitemap()) return;
   const directories = [...ENTRY_INDEX.entries()]
     .filter(([pathValue, entry]) => (
       entry?.isDir &&

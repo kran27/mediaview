@@ -16,6 +16,8 @@ if (!validModes.has(mode)) {
   process.exit(1);
 }
 
+process.env.MEDIAVIEW_MODE = mode;
+
 void (async () => {
   await loadHashCache();
 

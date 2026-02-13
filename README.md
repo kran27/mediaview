@@ -125,6 +125,11 @@ The image includes `ffmpeg` for video thumbnail generation.
 You can run the hash-cache and thumbnail workers in a separate container. The main
 server watches the shared `file-hashes.json` for changes.
 
+In this split setup, sitemap writes are handled by the `worker` process:
+
+- `worker` and `combined` modes write/update `sitemap.xml`.
+- `server` mode does not write sitemap files (read-only friendly).
+
 ```bash
 docker run --rm -p 3001:3001 \
   -e ARCHIVE_ROOT=/archive \
