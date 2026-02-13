@@ -96,7 +96,7 @@ To run workers in the same process for a single-container setup, use `node index
 Set these as Vite env variables (e.g., `client/.env.local` or your shell) and restart the dev server:
 
 - `VITE_API_BASE`: Base URL for API requests (default: empty, same origin).
-- `VITE_SHOW_STAGING`: Toggle the `STAGING` label in the header (`true`/`false`, default: `true`).
+- `VITE_SHOW_STAGING`: Toggle the `STAGING` label in the header (`true`/`false`, default: `false`).
 
 ## Server configuration
 

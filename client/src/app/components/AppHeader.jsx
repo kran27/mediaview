@@ -19,7 +19,7 @@ const AppHeader = forwardRef(({
   const searchValueRef = useRef('');
   const hasSearchText = Boolean(searchValue.trim() || searchQuery);
   const isSearchOpen = isSearchFocused || hasSearchText;
-  const showStaging = import.meta.env.VITE_SHOW_STAGING !== 'false';
+  const showStaging = import.meta.env.VITE_SHOW_STAGING === 'true';
 
   useImperativeHandle(ref, () => ({
     setSearchValue: (value) => {
