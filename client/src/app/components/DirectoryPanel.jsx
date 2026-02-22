@@ -21,6 +21,7 @@ import {
   IconFolder,
   IconFolderX,
   IconFolderOpen,
+  IconShare,
   IconSearch,
   SortButtons
 } from './index.js';
@@ -126,7 +127,7 @@ const DownloadProgressModal = ({
           {(state.status === 'listing'
             || state.status === 'downloading'
             || state.status === 'finalizing')
-            ? 'Indexing your selection, please wait.'
+            ? 'Preparing your selected files, please wait.'
             : 'You can close this window when you are ready.'}
         </div>
       </div>
@@ -200,10 +201,12 @@ const DirectoryPanelHeader = ({
   titleText,
   subLabel,
   hasError,
+  canSelectAllFiles,
   sortKey,
   sortDir,
   onSortClick,
-  onSetSelectionMode
+  onSetSelectionMode,
+  onSelectAllFiles
 }) => (
   <div className="panel-header">
     <div>
@@ -219,14 +222,25 @@ const DirectoryPanelHeader = ({
       {!hasError && (
         <>
           {selectionMode ? (
-            <button
-              type="button"
-              className="panel-action-btn is-emphasis"
-              onClick={() => onSetSelectionMode(false)}
-            >
-              <IconClose />
-              Cancel selection
-            </button>
+            <>
+              <button
+                type="button"
+                className="panel-action-btn"
+                onClick={onSelectAllFiles}
+                disabled={!canSelectAllFiles}
+              >
+                <IconCheckCircleFill />
+                Select all files
+              </button>
+              <button
+                type="button"
+                className="panel-action-btn is-emphasis"
+                onClick={() => onSetSelectionMode(false)}
+              >
+                <IconClose />
+                Cancel selection
+              </button>
+            </>
           ) : (
             <button
               type="button"
@@ -248,9 +262,12 @@ const DirectoryPanelBody = ({
   handlePanelBodyRef,
   contextMenu,
   onCloseContextMenu,
+  canSelectAllFiles,
+  onContextSelectAllFiles,
   onContextCancelSelection,
   onContextSelect,
   onContextDownload,
+  onContextShare,
   onContextGoToEntry,
   isSearchActive,
   downloadPrompt,
@@ -288,7 +305,8 @@ const DirectoryPanelBody = ({
   onOpenContextMenu,
   zoomLevel,
   panelBodyNode,
-  useWindowScroll
+  useWindowScroll,
+  contextMenuEntryPath
 }) => (
   <div className="panel-body" ref={handlePanelBodyRef}>
     {contextMenu?.open && (
@@ -305,12 +323,25 @@ const DirectoryPanelBody = ({
           role="menu"
         >
           {contextMenu.type === 'selection' ? (
-            <button type="button" className="context-menu-item" onClick={onContextCancelSelection}>
-              <span className="context-menu-icon" aria-hidden="true">
-                <IconClose />
-              </span>
-              Cancel
-            </button>
+            <>
+              <button
+                type="button"
+                className="context-menu-item"
+                onClick={onContextSelectAllFiles}
+                disabled={!canSelectAllFiles}
+              >
+                <span className="context-menu-icon" aria-hidden="true">
+                  <IconCheckCircleFill />
+                </span>
+                Select all files
+              </button>
+              <button type="button" className="context-menu-item" onClick={onContextCancelSelection}>
+                <span className="context-menu-icon" aria-hidden="true">
+                  <IconClose />
+                </span>
+                Cancel
+              </button>
+            </>
           ) : (
             <>
               <button type="button" className="context-menu-item" onClick={onContextSelect}>
@@ -324,6 +355,12 @@ const DirectoryPanelBody = ({
                   <IconDownload />
                 </span>
                 Download
+              </button>
+              <button type="button" className="context-menu-item" onClick={onContextShare}>
+                <span className="context-menu-icon" aria-hidden="true">
+                  <IconShare />
+                </span>
+                Share
               </button>
               {isSearchActive && (
                 <button type="button" className="context-menu-item" onClick={onContextGoToEntry}>
@@ -406,6 +443,7 @@ const DirectoryPanelBody = ({
               selectedPaths={selectedPaths}
               onToggleSelection={onToggleSelection}
               onOpenContextMenu={onOpenContextMenu}
+              contextMenuEntryPath={contextMenuEntryPath}
               zoomLevel={zoomLevel}
               scrollParent={panelBodyNode}
               useWindowScroll={useWindowScroll}
@@ -495,6 +533,7 @@ const DirectoryPanelBody = ({
               selectedPaths={selectedPaths}
               onToggleSelection={onToggleSelection}
               onOpenContextMenu={onOpenContextMenu}
+              contextMenuEntryPath={contextMenuEntryPath}
               zoomLevel={zoomLevel}
               scrollParent={panelBodyNode}
               useWindowScroll={useWindowScroll}
@@ -525,7 +564,11 @@ const DirectoryPanel = () => {
     selectedPaths,
     selectedCount = 0
   } = useSelectionStateContext() || {};
-  const { onToggleSelection, onSetSelectionMode } = useSelectionActionsContext() || {};
+  const {
+    onToggleSelection,
+    onSetSelectionMode,
+    onSelectAllFiles
+  } = useSelectionActionsContext() || {};
   const {
     downloadState,
     downloadPrompt
@@ -543,6 +586,7 @@ const DirectoryPanel = () => {
     onCloseContextMenu,
     onContextSelect,
     onContextDownload,
+    onContextShare,
     onContextCancelSelection,
     onContextGoToEntry
   } = useContextMenuContext() || {};
@@ -566,6 +610,9 @@ const DirectoryPanel = () => {
     : downloadState?.processedFiles;
   const downloadSummary = downloadPrompt?.summary;
   const showProgressModal = hasDownloadStatus;
+  const contextMenuEntryPath = contextMenu?.open && contextMenu?.type === 'entry'
+    ? (contextMenu.entry?.path || '')
+    : '';
   const [sortKey, setSortKey] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
   const titleText = isSearchActive
@@ -614,6 +661,11 @@ const DirectoryPanel = () => {
     return list;
   }, [baseEntries, collator, sortKey, sortDir]);
   const entryCount = sortedEntries.length;
+  const fileEntries = useMemo(
+    () => sortedEntries.filter((entry) => !entry?.isDir),
+    [sortedEntries]
+  );
+  const canSelectAllFiles = fileEntries.length > 0;
   const panelBodyRef = useRef(null);
   const [panelBodyNode, setPanelBodyNode] = useState(null);
   const handlePanelBodyRef = useCallback((node) => {
@@ -629,6 +681,15 @@ const DirectoryPanel = () => {
     setSortKey(key);
     setSortDir('asc');
   }, [sortKey]);
+
+  const handleSelectAllFiles = useCallback(() => {
+    onSelectAllFiles?.(sortedEntries);
+  }, [onSelectAllFiles, sortedEntries]);
+
+  const handleContextSelectAllFiles = useCallback(() => {
+    onSelectAllFiles?.(sortedEntries);
+    onCloseContextMenu?.();
+  }, [onCloseContextMenu, onSelectAllFiles, sortedEntries]);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -689,18 +750,23 @@ const DirectoryPanel = () => {
         titleText={titleText}
         subLabel={subLabel}
         hasError={hasError}
+        canSelectAllFiles={canSelectAllFiles}
         sortKey={sortKey}
         sortDir={sortDir}
         onSortClick={handleSortClick}
         onSetSelectionMode={onSetSelectionMode}
+        onSelectAllFiles={handleSelectAllFiles}
       />
       <DirectoryPanelBody
         handlePanelBodyRef={handlePanelBodyRef}
         contextMenu={contextMenu}
         onCloseContextMenu={onCloseContextMenu}
+        canSelectAllFiles={canSelectAllFiles}
+        onContextSelectAllFiles={handleContextSelectAllFiles}
         onContextCancelSelection={onContextCancelSelection}
         onContextSelect={onContextSelect}
         onContextDownload={onContextDownload}
+        onContextShare={onContextShare}
         onContextGoToEntry={onContextGoToEntry}
         isSearchActive={isSearchActive}
         downloadPrompt={downloadPrompt}
@@ -736,6 +802,7 @@ const DirectoryPanel = () => {
         selectedPaths={selectedPaths}
         onToggleSelection={onToggleSelection}
         onOpenContextMenu={onOpenContextMenu}
+        contextMenuEntryPath={contextMenuEntryPath}
         zoomLevel={zoomLevel}
         panelBodyNode={panelBodyNode}
         useWindowScroll={useWindowScroll}
