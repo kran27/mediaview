@@ -1,4 +1,4 @@
-import { ROOT_NAME, SITE_ORIGIN } from '../config.js';
+import { SITE_ORIGIN } from '../config.js';
 import { getCacheEpoch, getDirectoryEntries, hasDirectoryEntry } from './hash-cache.js';
 import { isExcludedPath, isHiddenPath } from './exclude.js';
 import { getPageContext, getRequestPath } from './page-context.js';

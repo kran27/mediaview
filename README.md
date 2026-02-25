@@ -97,6 +97,7 @@ Set these as Vite env variables (e.g., `client/.env.local` or your shell) and re
 
 - `VITE_API_BASE`: Base URL for API requests (default: empty, same origin).
 - `VITE_SHOW_STAGING`: Toggle the `STAGING` label in the header (`true`/`false`, default: `false`).
+- `VITE_APP_COMMIT_SHORT`: Optional short commit id shown in the footer build label (in local dev it falls back to a placeholder).
 
 ## Server configuration
 
@@ -119,6 +120,8 @@ docker run --rm -p 3001:3001 \
 ```
 
 The image includes `ffmpeg` for video thumbnail generation.
+
+The Dockerfile uses multi-stage builds with Docker Hardened Images (DHI), copying only runtime artifacts into the final image.
 
 ### Worker sidecar
 
@@ -165,4 +168,4 @@ Use `server` or `worker` to override the default `combined` mode.
 - Thumbnails and hashes are stored in `CACHE_ROOT`.
 - Video thumbnail generation requires `ffmpeg` to additionally be installed and available on PATH.
 - List, tree, and search responses are cached for 60 seconds; thumbnails are cached for 6 hours.
-- For production, build the client (`cd client && npm run build`) and serve it with your static server of choice.
+- In production, the Node server serves `client/dist` when available. Override with `CLIENT_DIST=/path/to/dist`.

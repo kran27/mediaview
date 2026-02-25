@@ -625,6 +625,7 @@
   appearance: none;
   -webkit-appearance: none;
   margin: 0;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
 
 .lightbox-download .icon,
@@ -646,6 +647,18 @@
   border-color: rgba(255, 255, 255, 0.24);
   background: rgba(255, 255, 255, 0.08);
   color: #f1f1f1;
+}
+
+.lightbox-close {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.02);
+  color: rgba(241, 241, 241, 0.72);
+}
+
+.lightbox-close:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(241, 241, 241, 0.9);
 }
 
 .lightbox-size,

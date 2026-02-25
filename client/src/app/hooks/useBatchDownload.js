@@ -112,14 +112,22 @@ export const useBatchDownload = () => {
     });
   }, [normalizeEntry, setSelectionModeSafe]);
 
-  const setSelectionEntries = useCallback((entries) => {
-    const next = new Map();
+  const createSelectionMap = useCallback((entries, base = null) => {
+    const next = base ? new Map(base) : new Map();
     entries.forEach((entry) => {
       if (!entry?.path) return;
       next.set(entry.path, normalizeEntry(entry));
     });
-    setSelectedEntries(next);
+    return next;
   }, [normalizeEntry]);
+
+  const setSelectionEntries = useCallback((entries) => {
+    setSelectedEntries(createSelectionMap(entries));
+  }, [createSelectionMap]);
+
+  const addSelectionEntries = useCallback((entries) => {
+    setSelectedEntries((prev) => createSelectionMap(entries, prev));
+  }, [createSelectionMap]);
 
   const clearSelection = useCallback(() => {
     setSelectedEntries(new Map());
@@ -243,11 +251,7 @@ export const useBatchDownload = () => {
 
     try {
       if (Array.isArray(overrideEntries) && overrideEntries.length > 0) {
-        setSelectedEntries(new Map(
-          overrideEntries
-            .filter((entry) => entry?.path)
-            .map((entry) => [entry.path, normalizeEntry(entry)])
-        ));
+        setSelectedEntries(createSelectionMap(overrideEntries));
       }
       const { files, totalBytes } = await expandSelection(entriesToDownload, controller.signal);
       const totalFiles = files.length;
@@ -284,7 +288,7 @@ export const useBatchDownload = () => {
     } finally {
       abortRef.current = null;
     }
-  }, [downloadState.status, expandSelection, getWriterMode, getWriterWarning, normalizeEntry, selectedEntries]);
+  }, [createSelectionMap, downloadState.status, expandSelection, getWriterMode, getWriterWarning, selectedEntries]);
 
   const downloadSelection = useCallback(async (overrideEntries, prepared) => {
     const entriesToDownload = Array.isArray(overrideEntries) && overrideEntries.length > 0
@@ -319,11 +323,7 @@ export const useBatchDownload = () => {
     let writer = null;
     try {
       if (Array.isArray(overrideEntries) && overrideEntries.length > 0) {
-        setSelectedEntries(new Map(
-          overrideEntries
-            .filter((entry) => entry?.path)
-            .map((entry) => [entry.path, normalizeEntry(entry)])
-        ));
+        setSelectedEntries(createSelectionMap(overrideEntries));
       }
       const selectionResult = preparedFiles
         ? { files: preparedFiles, totalBytes: preparedBytes || 0 }
@@ -461,7 +461,7 @@ export const useBatchDownload = () => {
     } finally {
       abortRef.current = null;
     }
-  }, [downloadState.status, expandSelection, getWriterMode, getWriterWarning, normalizeEntry, selectedEntries, updateProgress]);
+  }, [createSelectionMap, downloadState.status, expandSelection, getWriterMode, getWriterWarning, selectedEntries, updateProgress]);
 
   return {
     selectionMode,
@@ -470,6 +470,7 @@ export const useBatchDownload = () => {
     setSelectionMode: setSelectionModeSafe,
     toggleSelection,
     setSelectionEntries,
+    addSelectionEntries,
     clearSelection,
     discoverSelection,
     downloadSelection,

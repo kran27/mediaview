@@ -110,8 +110,10 @@
 }
 
 .footer-build {
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  color: var(--muted);
+  opacity: 0.75;
+  letter-spacing: 0.01em;
+  text-decoration: none;
 }
 
 @media (max-width: 900px) {

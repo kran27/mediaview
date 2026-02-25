@@ -52,6 +52,7 @@ const useAppController = () => {
     setSelectionMode,
     toggleSelection,
     setSelectionEntries,
+    addSelectionEntries,
     discoverSelection,
     downloadSelection,
     cancelDownload,
@@ -250,8 +251,8 @@ const useAppController = () => {
       ? entries.filter((entry) => entry?.path && !entry.isDir)
       : [];
     setSelectionMode(true);
-    setSelectionEntries(filesInView);
-  }, [setSelectionEntries, setSelectionMode]);
+    addSelectionEntries(filesInView);
+  }, [addSelectionEntries, setSelectionMode]);
 
   const handleRetryList = useCallback(() => {
     void loadDirectory(currentPath, { force: true });

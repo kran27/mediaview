@@ -201,12 +201,10 @@ const DirectoryPanelHeader = ({
   titleText,
   subLabel,
   hasError,
-  canSelectAllFiles,
   sortKey,
   sortDir,
   onSortClick,
-  onSetSelectionMode,
-  onSelectAllFiles
+  onSetSelectionMode
 }) => (
   <div className="panel-header">
     <div>
@@ -222,25 +220,14 @@ const DirectoryPanelHeader = ({
       {!hasError && (
         <>
           {selectionMode ? (
-            <>
-              <button
-                type="button"
-                className="panel-action-btn"
-                onClick={onSelectAllFiles}
-                disabled={!canSelectAllFiles}
-              >
-                <IconCheckCircleFill />
-                Select all files
-              </button>
-              <button
-                type="button"
-                className="panel-action-btn is-emphasis"
-                onClick={() => onSetSelectionMode(false)}
-              >
-                <IconClose />
-                Cancel selection
-              </button>
-            </>
+            <button
+              type="button"
+              className="panel-action-btn is-emphasis"
+              onClick={() => onSetSelectionMode(false)}
+            >
+              <IconClose />
+              Cancel selection
+            </button>
           ) : (
             <button
               type="button"
@@ -665,7 +652,13 @@ const DirectoryPanel = () => {
     () => sortedEntries.filter((entry) => !entry?.isDir),
     [sortedEntries]
   );
-  const canSelectAllFiles = fileEntries.length > 0;
+  const selectedFileCount = useMemo(
+    () => fileEntries.reduce((count, entry) => (
+      selectedPaths?.has(entry.path) ? count + 1 : count
+    ), 0),
+    [fileEntries, selectedPaths]
+  );
+  const canSelectAllFiles = fileEntries.length > 0 && selectedFileCount < fileEntries.length;
   const panelBodyRef = useRef(null);
   const [panelBodyNode, setPanelBodyNode] = useState(null);
   const handlePanelBodyRef = useCallback((node) => {
@@ -750,12 +743,10 @@ const DirectoryPanel = () => {
         titleText={titleText}
         subLabel={subLabel}
         hasError={hasError}
-        canSelectAllFiles={canSelectAllFiles}
         sortKey={sortKey}
         sortDir={sortDir}
         onSortClick={handleSortClick}
         onSetSelectionMode={onSetSelectionMode}
-        onSelectAllFiles={handleSelectAllFiles}
       />
       <DirectoryPanelBody
         handlePanelBodyRef={handlePanelBodyRef}
@@ -813,25 +804,41 @@ const DirectoryPanel = () => {
           role="region"
           aria-label="Selection mode"
         >
-          <div className="selection-bar-info">
-            <span className="selection-bar-icon" aria-hidden="true">
-              <IconCheck2Square />
-            </span>
-            <div className="selection-bar-title">Select items</div>
-          </div>
-          <div className="selection-bar-actions">
+          <div className="selection-bar-top">
+            <div className="selection-bar-info">
+              <span className="selection-bar-icon" aria-hidden="true">
+                <IconCheck2Square />
+              </span>
+              <div className="selection-bar-summary">
+                <div className="selection-bar-title">Select items</div>
+                <div className="selection-bar-meta">
+                  {selectedCount} selected
+                </div>
+              </div>
+            </div>
             <button
               type="button"
-              className="panel-action-btn"
+              className="panel-action-btn is-secondary selection-bar-cancel"
               onClick={() => onSetSelectionMode(false)}
               disabled={isDownloading}
             >
               <IconClose />
               Cancel
             </button>
+          </div>
+          <div className="selection-bar-actions">
             <button
               type="button"
-              className="panel-action-btn is-primary"
+              className="panel-action-btn is-secondary selection-bar-select-all"
+              onClick={handleSelectAllFiles}
+              disabled={!canSelectAllFiles || isDownloading}
+            >
+              <IconCheckCircleFill />
+              Select all files
+            </button>
+            <button
+              type="button"
+              className="panel-action-btn is-primary selection-bar-download"
               onClick={onRequestDownload}
               disabled={!hasSelection || isDownloading}
             >
