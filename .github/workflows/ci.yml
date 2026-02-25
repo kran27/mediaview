@@ -2,8 +2,6 @@ name: CI
 
 on:
   pull_request:
-  push:
-    branches: [main]
 
 permissions:
   contents: read
@@ -14,7 +12,7 @@ concurrency:
 
 jobs:
   frontend:
-    name: Frontend Build + Start
+    name: Frontend Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -36,7 +34,7 @@ jobs:
         working-directory: client
 
   backend:
-    name: Backend Build + Start
+    name: Backend Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
