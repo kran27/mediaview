@@ -10,6 +10,7 @@ import { useContextMenu } from './useContextMenu.js';
 import { useDownloadPrompt } from './useDownloadPrompt.js';
 import { useLightboxState } from './useLightboxState.js';
 import { useMediaQuery } from './useMediaQuery.js';
+import { brandConfig } from '../../config/branding.jsx';
 
 const useAppController = () => {
   const {
@@ -71,8 +72,8 @@ const useAppController = () => {
   const layoutRef = useRef(null);
   const loadDirectoryRef = useRef(loadDirectory);
   const isSearchMode = Boolean(searchQuery);
-  const baseTitle = "The Mirror's Edge Archive";
-  const currentPathName = currentPath ? getBasename(currentPath) : 'Archive';
+  const baseTitle = brandConfig.appName;
+  const currentPathName = currentPath ? getBasename(currentPath) : brandConfig.paths.rootName;
   const pendingSelectionPath = pendingSelection || '';
   const activeEntries = useMemo(() => (
     searchQuery

@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { brandData } from './src/config/brandingData.js';
 
 export default defineConfig({
   plugins: [
@@ -7,7 +8,16 @@ export default defineConfig({
       babel: {
         plugins: ['babel-plugin-react-compiler']
       }
-    })
+    }),
+    {
+      name: 'branding-transform',
+      transformIndexHtml(html) {
+        return html
+          .replace(/%VITE_APP_TITLE%/g, brandData.appName)
+          .replace(/%VITE_APP_DESCRIPTION%/g, brandData.appDescription)
+          .replace(/%VITE_APP_NOSCRIPT_MESSAGE%/g, brandData.noscriptMessage);
+      }
+    }
   ],
   server: {
     port: 5173,

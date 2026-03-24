@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { IconClose, IconGear, IconInfoCircle, IconSearch, ViewToggle } from './index.js';
 import { useViewContext } from '../contexts/index.js';
+import { brandConfig } from '../../config/branding.jsx';
 
 const AppHeader = forwardRef(({
   onNavigateRoot,
@@ -79,18 +80,14 @@ const AppHeader = forwardRef(({
         type="button"
         className="brand"
         onClick={onNavigateRoot}
-        aria-label="Go to archive root"
+        aria-label={brandConfig.paths.rootAriaLabel}
       >
         <span className="brand-mark" aria-hidden="true">
-          <svg viewBox="0 0 1000 1000" role="img" aria-hidden="true">
-            <path
-              className="brand-mark-path"
-              d="M2.834 97.434s4.5 87.038 271.204 353.74l-88.128 192.08 236.146-68.892 125.37 330.002L684.12 557.446h315.268s-126.598-166.16-416.9-236.144C292.18 252.272 133.932 210.392 2.832 97.434"            />
-          </svg>
+          <brandConfig.brandMark className="brand-mark-svg" />
         </span>
         <div>
           <div className="brand-title">
-            <p>The Mirror&apos;s Edge <b>Archive</b></p>
+            <p>{brandConfig.brandTitle.main} <b>{brandConfig.brandTitle.highlight}</b></p>
             {showStaging && <span className="brand-subtitle">STAGING</span>}
           </div>
         </div>
@@ -101,8 +98,8 @@ const AppHeader = forwardRef(({
             <span className="search-icon" aria-hidden="true">
               <IconSearch />
             </span>
-            <span className="search-label-full">Search the archive</span>
-            <span className="search-label-short">Search</span>
+            <span className="search-label-full">{brandConfig.search.labelFull}</span>
+            <span className="search-label-short">{brandConfig.search.labelShort}</span>
           </button>
           <span className="search-icon desktop" aria-hidden="true">
             <IconSearch />
@@ -110,7 +107,7 @@ const AppHeader = forwardRef(({
           <input
             ref={inputRef}
             type="search"
-            placeholder="Search the archive"
+            placeholder={brandConfig.search.placeholder}
             value={searchValue}
             onChange={(event) => {
               const { value } = event.target;
