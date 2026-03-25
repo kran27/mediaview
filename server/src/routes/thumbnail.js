@@ -84,10 +84,12 @@ export const registerThumbnailRoute = (app) => {
         : getThumbPath(hash, size, path.basename(requestPath));
       if (!fs.existsSync(thumbPath)) {
         try {
+          console.log(`[ThumbnailRoute] Missing thumbnail for ${requestPath} (${size}), triggering on-demand`);
           await generateThumbnailOnDemand(requestPath, size);
           if (!fs.existsSync(thumbPath)) {
             throw new Error('Thumbnail not found after generation');
           }
+          console.log(`[ThumbnailRoute] Successfully generated thumbnail for ${requestPath} (${size})`);
         } catch (genError) {
           console.error(`On-demand thumbnail generation failed for ${requestPath}`, genError);
           res.status(404).json({ error: 'Thumbnail not found' });

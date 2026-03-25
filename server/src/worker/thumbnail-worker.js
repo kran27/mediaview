@@ -83,6 +83,7 @@ const deleteThumbFiles = async (relativePath, hash) => {
 };
 
 const enqueueEntries = (entries) => {
+  console.log(`[ThumbnailWorker] Enqueuing ${entries.length} entries`);
   entries.forEach((entry) => {
     const relativePath = entry?.path;
     if (
@@ -91,8 +92,12 @@ const enqueueEntries = (entries) => {
       pending.has(relativePath) ||
       isExcludedPath(relativePath)
     ) {
+      if (relativePath && pending.has(relativePath)) {
+        console.log(`[ThumbnailWorker] ${relativePath} already pending`);
+      }
       return;
     }
+    console.log(`[ThumbnailWorker] Queuing ${relativePath}`);
     hashCache.set(relativePath, {
       hash: entry.hash,
       mtimeMs: entry.mtimeMs,

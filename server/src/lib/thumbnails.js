@@ -77,7 +77,8 @@ export const generateThumbnailOnDemand = async (relativePath, size) => {
   }
 
   if (getThumbErrCount(relativePath) > THUMB_ERR_LIMIT) {
-    throw new Error('Thumbnail generation failed too many times');
+    console.log(`[Thumbnails] Clearing error count for ${relativePath} due to on-demand request`);
+    resetThumbErrCount(relativePath);
   }
 
   if (!isThumbablePath(relativePath)) {
@@ -85,50 +86,56 @@ export const generateThumbnailOnDemand = async (relativePath, size) => {
   }
 
   const jobKey = `${relativePath}:${size}`;
-  if (onDemandJobs.has(jobKey)) {
-    return onDemandJobs.get(jobKey);
+  const existingJob = onDemandJobs.get(jobKey);
+  if (existingJob) {
+    console.log(`[Thumbnails] Job already in progress for ${jobKey}`);
+    return existingJob.promise;
   }
 
+  console.log(`[Thumbnails] Starting on-demand generation for ${jobKey}`);
+
+  let jobResolve;
+  let jobReject;
   const jobPromise = new Promise((resolve, reject) => {
-    const workerIndex = getWorkerIndex(relativePath);
-    const worker = thumbnailWorkers[workerIndex];
+    jobResolve = resolve;
+    jobReject = reject;
+  });
 
-    if (!worker) {
-      reject(new Error('No worker available for job'));
-      return;
-    }
+  const workerIndex = getWorkerIndex(relativePath);
+  const worker = thumbnailWorkers[workerIndex];
 
-    const job = {
-      resolve: () => {
-        onDemandJobs.delete(jobKey);
-        resolve();
+  if (!worker) {
+    throw new Error('No worker available for job');
+  }
+
+  const job = {
+    promise: jobPromise,
+    resolve: () => {
+      onDemandJobs.delete(jobKey);
+      jobResolve();
+    },
+    reject: (error) => {
+      onDemandJobs.delete(jobKey);
+      jobReject(error);
+    },
+    timeout: setTimeout(() => {
+      onDemandJobs.delete(jobKey);
+      jobReject(new Error('Thumbnail generation timed out'));
+    }, 30000),
+  };
+
+  onDemandJobs.set(jobKey, job);
+
+  worker.postMessage({
+    type: 'enqueue',
+    entries: [
+      {
+        path: relativePath,
+        hash: cached.hash,
+        mtimeMs: cached.mtimeMs,
+        size: cached.size ?? null,
       },
-      reject: (error) => {
-        onDemandJobs.delete(jobKey);
-        reject(error);
-      },
-      timeout: setTimeout(() => {
-        onDemandJobs.delete(jobKey);
-        reject(new Error('Thumbnail generation timed out'));
-      }, 30000),
-    };
-
-    onDemandJobs.set(jobKey, jobPromise);
-
-    worker.postMessage({
-      type: 'enqueue',
-      entries: [
-        {
-          path: relativePath,
-          hash: cached.hash,
-          mtimeMs: cached.mtimeMs,
-          size: cached.size ?? null,
-        },
-      ],
-    });
-
-    // We rely on the worker message handler to resolve/reject via path matching
-    // since worker.on('message') is already listening globally in startThumbnailWorker.
+    ],
   });
 
   return jobPromise;
@@ -193,6 +200,7 @@ export const startThumbnailWorker = async () => {
       });
       worker.on('message', (message) => {
         if (message?.path) {
+          console.log(`[Thumbnails] Worker message for ${message.path}: ${message.type}`);
           const sizeKeys = Object.keys(THUMB_SIZES);
           sizeKeys.forEach((size) => {
             const jobKey = `${message.path}:${size}`;
@@ -201,8 +209,10 @@ export const startThumbnailWorker = async () => {
               clearTimeout(job.timeout);
               onDemandJobs.delete(jobKey);
               if (message.type === 'thumb-success') {
+                console.log(`[Thumbnails] Job successful for ${jobKey}`);
                 job.resolve();
               } else if (message.type === 'thumb-error') {
+                console.log(`[Thumbnails] Job failed for ${jobKey}`);
                 job.reject(new Error('Thumbnail generation failed'));
               }
             }
