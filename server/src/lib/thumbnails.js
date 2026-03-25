@@ -16,14 +16,10 @@ import {
 } from './hash-cache.js';
 
 const WORKER_POOL_LIMIT = 4;
-const VERIFY_THUMBS_INTERVAL_MS = 60 * 60 * 1000;
-const POST_SCAN_VERIFY_DELAY_MS = 5 * 1000;
 const thumbnailWorkers = [];
 let unsubscribeScanComplete = null;
-let verifyTimer = null;
-let verifyingThumbs = false;
-let postScanVerifyTimer = null;
 let initialScanVerified = false;
+const onDemandJobs = new Map();
 
 const ensureThumbDir = async () => {
   try {
@@ -70,43 +66,75 @@ export const enqueueThumbnailJobs = (paths) => {
   });
 };
 
-const verifyThumbnailCoverage = () => {
-  if (thumbnailWorkers.length === 0 || verifyingThumbs) return;
-  verifyingThumbs = true;
-  try {
-    const candidates = [];
-    const sizeKeys = Object.keys(THUMB_SIZES);
-    const entries = getHashEntries();
-    entries.forEach((entry) => {
-      if (!entry?.path || !entry?.hash) return;
-      if (getThumbErrCount(entry.path) > THUMB_ERR_LIMIT) return;
-      if (!isThumbablePath(entry.path)) return;
-      const originalName = path.basename(entry.path);
-      const missing = sizeKeys.some((sizeKey) => {
-        const thumbPath = getThumbPath(entry.hash, sizeKey, originalName);
-        return !fs.existsSync(thumbPath);
-      });
-      if (missing) {
-        candidates.push(entry.path);
-      }
-    });
-    if (candidates.length > 0) {
-      enqueueThumbnailJobs(candidates);
-    }
-  } finally {
-    verifyingThumbs = false;
+export const generateThumbnailOnDemand = async (relativePath, size) => {
+  if (thumbnailWorkers.length === 0) {
+    throw new Error('Thumbnail workers not available');
   }
+
+  const cached = getHashEntry(relativePath);
+  if (!cached?.hash) {
+    throw new Error('File hash not found');
+  }
+
+  if (getThumbErrCount(relativePath) > THUMB_ERR_LIMIT) {
+    throw new Error('Thumbnail generation failed too many times');
+  }
+
+  if (!isThumbablePath(relativePath)) {
+    throw new Error('Path is not thumbable');
+  }
+
+  const jobKey = `${relativePath}:${size}`;
+  if (onDemandJobs.has(jobKey)) {
+    return onDemandJobs.get(jobKey);
+  }
+
+  const jobPromise = new Promise((resolve, reject) => {
+    const workerIndex = getWorkerIndex(relativePath);
+    const worker = thumbnailWorkers[workerIndex];
+
+    if (!worker) {
+      reject(new Error('No worker available for job'));
+      return;
+    }
+
+    const job = {
+      resolve: () => {
+        onDemandJobs.delete(jobKey);
+        resolve();
+      },
+      reject: (error) => {
+        onDemandJobs.delete(jobKey);
+        reject(error);
+      },
+      timeout: setTimeout(() => {
+        onDemandJobs.delete(jobKey);
+        reject(new Error('Thumbnail generation timed out'));
+      }, 30000),
+    };
+
+    onDemandJobs.set(jobKey, jobPromise);
+
+    worker.postMessage({
+      type: 'enqueue',
+      entries: [
+        {
+          path: relativePath,
+          hash: cached.hash,
+          mtimeMs: cached.mtimeMs,
+          size: cached.size ?? null,
+        },
+      ],
+    });
+
+    // We rely on the worker message handler to resolve/reject via path matching
+    // since worker.on('message') is already listening globally in startThumbnailWorker.
+  });
+
+  return jobPromise;
 };
 
-const schedulePostScanVerify = () => {
-  if (postScanVerifyTimer) {
-    clearTimeout(postScanVerifyTimer);
-  }
-  postScanVerifyTimer = setTimeout(() => {
-    postScanVerifyTimer = null;
-    verifyThumbnailCoverage();
-  }, POST_SCAN_VERIFY_DELAY_MS);
-};
+// Proactive verification disabled for on-demand mode
 
 const getWorkerCount = () => {
   const cpuCount = os.cpus()?.length || 1;
@@ -123,16 +151,10 @@ const getWorkerIndex = (pathValue) => {
   return Math.abs(hash) % thumbnailWorkers.length;
 };
 
-const dispatchSync = (updates, removals) => {
+const dispatchSync = (_updates, removals) => {
   if (thumbnailWorkers.length === 0) return;
   const buckets = new Map();
-  updates.forEach((entry) => {
-    if (!entry?.path) return;
-    if (getThumbErrCount(entry.path) > THUMB_ERR_LIMIT) return;
-    const index = getWorkerIndex(entry.path);
-    if (!buckets.has(index)) buckets.set(index, { updates: [], removals: [] });
-    buckets.get(index).updates.push(entry);
-  });
+  // We only sync removals in on-demand mode to keep storage clean
   removals.forEach((entry) => {
     const pathValue = entry?.path;
     if (!pathValue) return;
@@ -141,12 +163,12 @@ const dispatchSync = (updates, removals) => {
     buckets.get(index).removals.push(entry);
   });
   buckets.forEach((payload, index) => {
-    if (payload.updates.length === 0 && payload.removals.length === 0) return;
+    if (payload.removals.length === 0) return;
     const worker = thumbnailWorkers[index];
     if (!worker) return;
     worker.postMessage({
       type: 'sync',
-      entries: payload.updates,
+      entries: [],
       removals: payload.removals,
     });
   });
@@ -170,6 +192,22 @@ export const startThumbnailWorker = async () => {
         console.error(`Thumbnail worker ${index + 1} error`, error);
       });
       worker.on('message', (message) => {
+        if (message?.path) {
+          const sizeKeys = Object.keys(THUMB_SIZES);
+          sizeKeys.forEach((size) => {
+            const jobKey = `${message.path}:${size}`;
+            const job = onDemandJobs.get(jobKey);
+            if (job) {
+              clearTimeout(job.timeout);
+              onDemandJobs.delete(jobKey);
+              if (message.type === 'thumb-success') {
+                job.resolve();
+              } else if (message.type === 'thumb-error') {
+                job.reject(new Error('Thumbnail generation failed'));
+              }
+            }
+          });
+        }
         if (message?.type === 'thumb-error' && message.path) {
           incrementThumbErrCount(message.path);
         }
@@ -186,22 +224,12 @@ export const startThumbnailWorker = async () => {
     }
     unsubscribeScanComplete?.();
     unsubscribeScanComplete = onHashScanComplete(({ updates, removals }) => {
-      const hasChanges = updates.length > 0 || removals.length > 0;
-      if (hasChanges) {
-        dispatchSync(updates, removals);
-      }
-      if (!initialScanVerified) {
-        initialScanVerified = true;
-        schedulePostScanVerify();
-        return;
-      }
-      if (hasChanges) {
-        schedulePostScanVerify();
+      // Background updates are ignored in on-demand mode.
+      // We only process removals to delete stale thumbnails.
+      if (removals.length > 0) {
+        dispatchSync([], removals);
       }
     });
-    if (!verifyTimer) {
-      verifyTimer = setInterval(verifyThumbnailCoverage, VERIFY_THUMBS_INTERVAL_MS);
-    }
   } catch (error) {
     console.error('Failed to start thumbnail worker', error);
   }

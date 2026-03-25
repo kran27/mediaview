@@ -8,7 +8,7 @@ import { isExcludedPath } from '../lib/exclude.js';
 import { matchesEtag } from '../lib/http.js';
 import { decodePathSegments, resolveSafePath, sanitizeRequestPath } from '../lib/paths.js';
 import { getHashEntry, hasHashEntry } from '../lib/hash-cache.js';
-import { getThumbPath } from '../lib/thumbnails.js';
+import { getThumbPath, generateThumbnailOnDemand } from '../lib/thumbnails.js';
 
 const parseThumbnailRequest = (req) => {
   if (typeof req.params.size === 'string' && (typeof req.params.path === 'string' || Array.isArray(req.params.path))) {
@@ -83,8 +83,16 @@ export const registerThumbnailRoute = (app) => {
         ? getThumbPath(hash, size, path.basename(requestPath), '.jpg')
         : getThumbPath(hash, size, path.basename(requestPath));
       if (!fs.existsSync(thumbPath)) {
-        res.status(404).json({ error: 'Thumbnail not found' });
-        return;
+        try {
+          await generateThumbnailOnDemand(requestPath, size);
+          if (!fs.existsSync(thumbPath)) {
+            throw new Error('Thumbnail not found after generation');
+          }
+        } catch (genError) {
+          console.error(`On-demand thumbnail generation failed for ${requestPath}`, genError);
+          res.status(404).json({ error: 'Thumbnail not found' });
+          return;
+        }
       }
       const mimeType = mime.lookup(thumbPath) || 'application/octet-stream';
       const etag = `"${hash}"`;

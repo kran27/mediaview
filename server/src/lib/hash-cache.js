@@ -26,6 +26,8 @@ const DIR_CHILDREN = new Map();
 const NAME_INDEX = new Map();
 const hashListeners = new Set();
 const scanListeners = new Set();
+
+
 let cacheWorker = null;
 let cacheFileWatcher = null;
 let cacheWatchTimer = null;
@@ -59,27 +61,28 @@ const getParentPath = (relativePath) => {
 };
 
 const ensureDirEntry = (relativePath) => {
+  const rawKey = relativePath || '';
   const key = relativePath || '';
   const existing = ENTRY_INDEX.get(key);
   if (!existing || !existing.isDir) {
-    const name = key ? path.basename(key) : ROOT_NAME;
+    const name = rawKey ? path.basename(rawKey) : ROOT_NAME;
     ENTRY_INDEX.set(key, {
       name,
-      path: key,
+      path: rawKey,
       isDir: true,
       size: null,
       ext: '',
       type: 'dir',
     });
-    NAME_INDEX.set(key, name.toLowerCase());
+    NAME_INDEX.set(key, name);
   } else if (existing?.name) {
-    NAME_INDEX.set(key, existing.name.toLowerCase());
+    NAME_INDEX.set(key, existing.name);
   }
   if (!DIR_CHILDREN.has(key)) {
     DIR_CHILDREN.set(key, new Set());
   }
-  const parentPath = getParentPath(key);
-  if (parentPath !== null && key !== '') {
+  const parentPath = getParentPath(rawKey);
+  if (parentPath !== null && rawKey !== '') {
     ensureDirEntry(parentPath);
     DIR_CHILDREN.get(parentPath).add(key);
   }
@@ -87,9 +90,10 @@ const ensureDirEntry = (relativePath) => {
 
 const upsertFileEntry = (relativePath, entry) => {
   if (!relativePath) return;
+  const key = relativePath;
   const ext = path.extname(relativePath).toLowerCase();
   const name = path.basename(relativePath);
-  ENTRY_INDEX.set(relativePath, {
+  ENTRY_INDEX.set(key, {
     name,
     path: relativePath,
     isDir: false,
@@ -97,30 +101,31 @@ const upsertFileEntry = (relativePath, entry) => {
     ext,
     type: classifyFile(ext),
   });
-  NAME_INDEX.set(relativePath, name.toLowerCase());
+  NAME_INDEX.set(key, name);
   const parentPath = getParentPath(relativePath);
   if (parentPath !== null) {
     ensureDirEntry(parentPath);
-    DIR_CHILDREN.get(parentPath).add(relativePath);
+    DIR_CHILDREN.get(parentPath).add(key);
   }
 };
 
 const removeEntryIndex = (relativePath) => {
-  if (relativePath === '') return false;
-  const existing = ENTRY_INDEX.get(relativePath);
+  if (!relativePath) return false;
+  const key = relativePath;
+  const existing = ENTRY_INDEX.get(key);
   if (!existing) return false;
   if (existing.isDir) {
-    const children = DIR_CHILDREN.get(relativePath);
+    const children = DIR_CHILDREN.get(key);
     if (children) {
-      [...children].forEach((childPath) => removeEntryIndex(childPath));
+      [...children].forEach((childKey) => removeEntryIndex(childKey));
     }
-    DIR_CHILDREN.delete(relativePath);
+    DIR_CHILDREN.delete(key);
   }
-  ENTRY_INDEX.delete(relativePath);
-  NAME_INDEX.delete(relativePath);
-  const parentPath = getParentPath(relativePath);
+  ENTRY_INDEX.delete(key);
+  NAME_INDEX.delete(key);
+  const parentPath = getParentPath(existing.path);
   if (parentPath !== null) {
-    DIR_CHILDREN.get(parentPath)?.delete(relativePath);
+    DIR_CHILDREN.get(parentPath)?.delete(key);
   }
   return true;
 };
@@ -246,10 +251,11 @@ const queueThumbUpdate = (entry, previousHash) => {
 
 const queueThumbRemoval = (relativePath, removalHash) => {
   if (!relativePath) return;
-  const existing = pendingThumbUpdates.get(relativePath);
+  const key = relativePath;
+  const existing = pendingThumbUpdates.get(key);
   const hash = removalHash || existing?.hash || existing?.previousHash || null;
-  pendingThumbUpdates.delete(relativePath);
-  pendingThumbRemovals.set(relativePath, { path: relativePath, hash });
+  pendingThumbUpdates.delete(key);
+  pendingThumbRemovals.set(key, { path: relativePath, hash });
 };
 
 const flushThumbQueue = () => {
@@ -291,7 +297,11 @@ export const setHashEntry = (relativePath, entry, options = {}) => {
 };
 
 export const removeHashEntry = (relativePath, options = {}) => {
-  if (!HASH_CACHE.delete(relativePath)) return;
+  console.log(`[HashCache] removeHashEntry: ${relativePath}`);
+  if (!HASH_CACHE.delete(relativePath)) {
+    console.log(`[HashCache] removeHashEntry failed (not found): ${relativePath}`);
+    return;
+  }
   markDirty();
   const existing = ENTRY_INDEX.get(relativePath);
   if (existing && !existing.isDir) {
@@ -359,10 +369,11 @@ export const getThumbErrCount = (relativePath) =>
 
 export const incrementThumbErrCount = (relativePath) => {
   if (!relativePath) return 0;
-  const existing = HASH_CACHE.get(relativePath);
+  const key = relativePath;
+  const existing = HASH_CACHE.get(key);
   if (!existing) return 0;
   const nextCount = (existing.thumbErrCount ?? 0) + 1;
-  HASH_CACHE.set(relativePath, { ...existing, thumbErrCount: nextCount });
+  HASH_CACHE.set(key, { ...existing, thumbErrCount: nextCount });
   markDirty();
   scheduleFlush();
   return nextCount;
@@ -370,26 +381,26 @@ export const incrementThumbErrCount = (relativePath) => {
 
 export const resetThumbErrCount = (relativePath) => {
   if (!relativePath) return;
-  const existing = HASH_CACHE.get(relativePath);
+  const key = relativePath;
+  const existing = HASH_CACHE.get(key);
   if (!existing || (existing.thumbErrCount ?? 0) === 0) return;
   const rest = { ...existing };
   delete rest.thumbErrCount;
-  HASH_CACHE.set(relativePath, rest);
+  HASH_CACHE.set(key, rest);
   markDirty();
   scheduleFlush();
 };
 
 export const hasDirectoryEntry = (relativePath) =>
-  ENTRY_INDEX.get(relativePath || '')?.isDir === true;
+  ENTRY_INDEX.get(relativePath)?.isDir === true;
 
 export const getDirectoryEntries = (relativePath) => {
-  const key = relativePath || '';
-  const children = DIR_CHILDREN.get(key);
+  const children = DIR_CHILDREN.get(relativePath);
   if (!children) return null;
   const entries = [];
-  children.forEach((childPath) => {
-    const entry = ENTRY_INDEX.get(childPath);
-    if (entry && !isHiddenPath(childPath)) entries.push(entry);
+  children.forEach((childKey) => {
+    const entry = ENTRY_INDEX.get(childKey);
+    if (entry && !isHiddenPath(entry.path)) entries.push(entry);
   });
   entries.sort((a, b) => {
     if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
@@ -400,13 +411,13 @@ export const getDirectoryEntries = (relativePath) => {
 
 export const getDirectoryTree = () => {
   const nodes = {};
-  for (const [pathValue, entry] of ENTRY_INDEX.entries()) {
+  for (const [key, entry] of ENTRY_INDEX.entries()) {
     if (!entry?.isDir) continue;
-    if (isHiddenPath(pathValue)) continue;
-    nodes[pathValue] = {
-      name: entry.name || (pathValue ? path.basename(pathValue) : ROOT_NAME),
-      path: pathValue,
-      parent: getParentPath(pathValue),
+    if (isHiddenPath(entry.path)) continue;
+    nodes[entry.path] = {
+      name: entry.name,
+      path: entry.path,
+      parent: getParentPath(entry.path),
     };
   }
   return nodes;
@@ -419,8 +430,11 @@ export const setDirectoryEntry = (relativePath) => {
 
 export const removeDirectoryEntry = (relativePath) => {
   if (!relativePath) return;
+  console.log(`[HashCache] removeDirectoryEntry: ${relativePath}`);
   if (ENTRY_INDEX.get(relativePath)?.isDir) {
     removeEntryIndex(relativePath);
+  } else {
+    console.log(`[HashCache] removeDirectoryEntry failed (not a dir or not found): ${relativePath}`);
   }
 };
 
@@ -568,13 +582,13 @@ export const getCacheEpoch = () => cacheEpoch;
 
 const writeSitemapIfChanged = async () => {
   if (!shouldWriteSitemap()) return;
-  const directories = [...ENTRY_INDEX.entries()]
-    .filter(([pathValue, entry]) => (
+  const directories = [...ENTRY_INDEX.values()]
+    .filter((entry) => (
       entry?.isDir &&
-      !isHiddenPath(pathValue) &&
-      !isExcludedPath(pathValue)
+      !isHiddenPath(entry.path) &&
+      !isExcludedPath(entry.path)
     ))
-    .map(([pathValue]) => pathValue);
+    .map((entry) => entry.path);
   const nextHash = directories.join('\n');
   if (nextHash === sitemapHash) return;
   await writeSitemap({
@@ -590,8 +604,7 @@ const DEFAULT_SEARCH_LIMIT = 100;
 const SEARCH_CHUNK_SIZE = 500;
 
 export const searchHashCache = async (query) => {
-  const normalized = String(query || '').trim().toLowerCase();
-  if (!normalized) {
+  if (!query) {
     return { results: [], truncated: false };
   }
   const limit = DEFAULT_SEARCH_LIMIT;
@@ -599,23 +612,21 @@ export const searchHashCache = async (query) => {
   let truncated = false;
   let scanned = 0;
 
-  for (const [pathValue, nameLower] of NAME_INDEX.entries()) {
-    if (!pathValue || isHiddenPath(pathValue)) {
+  for (const [key, name] of NAME_INDEX.entries()) {
+    const entry = ENTRY_INDEX.get(key);
+    if (!entry || isHiddenPath(entry.path)) {
       continue;
     }
     scanned += 1;
-    if (nameLower && nameLower.includes(normalized)) {
-      const entry = ENTRY_INDEX.get(pathValue);
-      if (entry) {
-        results.push({
-          name: entry.name,
-          path: entry.path,
-          isDir: entry.isDir,
-          size: entry.size ?? null,
-          ext: entry.ext,
-          type: entry.type,
-        });
-      }
+    if (name && name.includes(query)) {
+      results.push({
+        name: entry.name,
+        path: entry.path,
+        isDir: entry.isDir,
+        size: entry.size ?? null,
+        ext: entry.ext,
+        type: entry.type,
+      });
       if (results.length >= limit) {
         truncated = true;
         break;

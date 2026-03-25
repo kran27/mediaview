@@ -63,7 +63,7 @@ export const useDirectoryCache = ({ updateTreeWithEntries }) => {
     const url = encodedPath ? `${API_BASE}/api/list/${encodedPath}` : `${API_BASE}/api/list`;
     const request = (async () => {
       try {
-        const response = await fetch(url);
+        const response = await fetch(url, { cache: 'no-cache' });
         if (!response.ok) {
           if (response.status === 404) {
             throw createRequestError('Requested content could not be found.', response.status);
